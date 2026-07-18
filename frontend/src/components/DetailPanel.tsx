@@ -3,18 +3,19 @@ import {
   IconCalendar,
   IconCalendarStats,
   IconCheck,
-  IconDots,
-  IconFlag,
   IconList,
+  IconPencil,
   IconRepeat,
   IconSquare,
   IconSquareCheck,
   IconX,
 } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 import { selectTask, toggleDone } from "../app/dashboardSlice";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { fmtDate, fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
 import type { DashboardItem } from "../types";
+import TaskEditor from "./TaskEditor";
 
 function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; children: React.ReactNode }) {
   return (
@@ -31,7 +32,11 @@ const pill = "inline-flex items-center gap-1.5 rounded-lg px-[11px] py-1 text-[1
 function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => void }) {
   const dispatch = useAppDispatch();
   const today = useAppSelector((s) => s.dashboard.date);
+  const [editing, setEditing] = useState(false);
   const t = item.task;
+
+  // 切换选中任务时退出编辑态
+  useEffect(() => setEditing(false), [t.id]);
 
   return (
     <>
@@ -42,14 +47,25 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           {item.pendingSync && <span className="text-[11px]">· 待同步</span>}
         </span>
         <div className="ml-auto flex gap-1.5">
-          <button aria-label="标记优先" className="text-ink3 opacity-55" title="规划中"><IconFlag size={17} /></button>
-          <button aria-label="更多" className="text-ink3 opacity-55" title="规划中"><IconDots size={17} /></button>
+          <button
+            aria-label="编辑"
+            title="编辑日期 / 循环规则 / 提醒"
+            onClick={() => setEditing((v) => !v)}
+            className={editing ? "text-accent" : "text-ink3 hover:text-ink"}
+          >
+            <IconPencil size={17} />
+          </button>
           <button aria-label="关闭" className="text-ink3 hover:text-ink xl:hidden" onClick={onClose}>
             <IconX size={17} />
           </button>
         </div>
       </div>
 
+      {editing ? (
+        <div className="flex-1 p-5">
+          <TaskEditor task={t} onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} />
+        </div>
+      ) : (
       <div className="flex-1 p-5">
         <div className="mb-3 text-xs text-ink3">今天 ›</div>
         <div className="mb-5 flex items-start gap-3">
@@ -112,6 +128,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           />
         </div>
       </div>
+      )}
 
       <div className="flex items-center gap-2 border-t border-line px-5 py-3 text-xs text-ink3">
         <IconBell size={14} /> 到点会写入提醒,客户端从这里拉取

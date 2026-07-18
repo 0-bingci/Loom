@@ -4,6 +4,7 @@ import {
   IconCheckbox,
   IconInbox,
   IconNote,
+  IconPencil,
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
@@ -14,6 +15,7 @@ import { useAppDispatch, useAppSelector } from "../app/store";
 import { api, ulid } from "../lib/api";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate } from "../lib/format";
+import TaskEditor from "../components/TaskEditor";
 import type { Task } from "../types";
 
 interface TaskWithStatus extends Task {
@@ -29,7 +31,7 @@ interface Note {
 
 type Entry =
   | { kind: "note"; id: string; text: string; created_at: string }
-  | { kind: "task"; id: string; text: string; created_at: string };
+  | { kind: "task"; id: string; text: string; created_at: string; task: Task };
 
 /** 收集箱:随手记的碎片 + 还没安排的待办,一条时间流。 */
 export default function InboxPage() {
@@ -40,6 +42,7 @@ export default function InboxPage() {
   const [kind, setKind] = useState<"note" | "task">("note"); // 随手记的更多,碎片是默认
   const [error, setError] = useState(false);
   const [schedulingId, setSchedulingId] = useState<string | null>(null); // 正在挑日期的待办
+  const [editingId, setEditingId] = useState<string | null>(null); // 正在编辑的待办
 
   const load = useCallback(async () => {
     try {
@@ -49,7 +52,7 @@ export default function InboxPage() {
       ]);
       const taskEntries: Entry[] = tasks
         .filter((t) => !t.due_date && !t.recurrence && !t.once_done && !t.archived)
-        .map((t) => ({ kind: "task", id: t.id, text: t.title, created_at: t.created_at }));
+        .map((t) => ({ kind: "task", id: t.id, text: t.title, created_at: t.created_at, task: t }));
       const noteEntries: Entry[] = notes.map((n) => ({
         kind: "note",
         id: n.id,
@@ -72,7 +75,13 @@ export default function InboxPage() {
     if (!trimmed) return;
     const id = ulid();
     setTitle("");
-    setEntries((prev) => [{ kind, id, text: trimmed, created_at: new Date().toISOString() }, ...prev]);
+    const created_at = new Date().toISOString();
+    setEntries((prev) => [
+      kind === "note"
+        ? { kind: "note", id, text: trimmed, created_at }
+        : { kind: "task", id, text: trimmed, created_at, task: blankTask(id, trimmed) },
+      ...prev,
+    ]);
     if (kind === "note") {
       await sendOrQueue({ method: "POST", path: "/notes", body: { id, content: trimmed } });
     } else {
@@ -103,7 +112,11 @@ export default function InboxPage() {
   const noteToTask = async (e: Entry) => {
     const taskId = ulid();
     setEntries((prev) =>
-      prev.map((x) => (x.id === e.id ? { ...x, kind: "task" as const, id: taskId } : x)),
+      prev.map((x) =>
+        x.id === e.id
+          ? { kind: "task" as const, id: taskId, text: x.text, created_at: x.created_at, task: blankTask(taskId, x.text) }
+          : x,
+      ),
     );
     await sendOrQueue({ method: "POST", path: "/tasks", body: { id: taskId, title: e.text } });
     await sendOrQueue({ method: "DELETE", path: `/notes/${e.id}` });
@@ -182,8 +195,9 @@ export default function InboxPage() {
 
               <div className="flex shrink-0 items-center gap-1.5">
                 {e.kind === "task" ? (
+                  <>
                   <button
-                    onClick={() => setSchedulingId(schedulingId === e.id ? null : e.id)}
+                    onClick={() => { setSchedulingId(schedulingId === e.id ? null : e.id); setEditingId(null); }}
                     title="安排日期"
                     className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] ${
                       schedulingId === e.id
@@ -194,6 +208,15 @@ export default function InboxPage() {
                     <IconCalendarPlus size={13} />
                     <span className="hidden md:inline">安排</span>
                   </button>
+                  <button
+                    aria-label="编辑"
+                    title="编辑(可设为循环任务)"
+                    onClick={() => { setEditingId(editingId === e.id ? null : e.id); setSchedulingId(null); }}
+                    className={editingId === e.id ? "text-accent" : "text-ink3 hover:text-ink"}
+                  >
+                    <IconPencil size={15} />
+                  </button>
+                  </>
                 ) : (
                   <button
                     onClick={() => void noteToTask(e)}
@@ -209,6 +232,19 @@ export default function InboxPage() {
                 </button>
               </div>
             </div>
+
+            {editingId === e.id && e.kind === "task" && (
+              <div className="mt-2 rounded-[10px] border border-line bg-bg p-3 md:ml-8">
+                <TaskEditor
+                  task={e.task}
+                  onSaved={() => {
+                    setEditingId(null);
+                    void load(); // 设了日期/循环的会离开收集箱
+                  }}
+                  onCancel={() => setEditingId(null)}
+                />
+              </div>
+            )}
 
             {schedulingId === e.id && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8 text-xs">
@@ -240,4 +276,19 @@ export default function InboxPage() {
       </div>
     </main>
   );
+}
+
+/** 乐观更新用的占位任务对象(收集箱任务:无日期无循环) */
+function blankTask(id: string, title: string): Task {
+  return {
+    id,
+    title,
+    due_date: null,
+    recurrence: null,
+    start_date: null,
+    end_date: null,
+    remind_time: null,
+    archived: false,
+    created_at: new Date().toISOString(),
+  };
 }
