@@ -13,6 +13,7 @@ export interface CreateTaskInput {
   start_date?: string | null;
   end_date?: string | null;
   remind_time?: string | null;
+  note?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -22,6 +23,7 @@ export interface UpdateTaskInput {
   start_date?: string | null;
   end_date?: string | null;
   remind_time?: string | null;
+  note?: string | null;
   archived?: boolean;
 }
 
@@ -29,8 +31,8 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const id = input.id ?? ulid();
   // ON CONFLICT DO NOTHING + 回读:同 id 重放时返回已存在的那条(以先到的为准),不报错不重复。
   const { rows } = await getPool().query<Task>(
-    `INSERT INTO tasks (id, title, due_date, recurrence, start_date, end_date, remind_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO tasks (id, title, due_date, recurrence, start_date, end_date, remind_time, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (id) DO NOTHING
      RETURNING *`,
     [
@@ -41,6 +43,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
       input.start_date ?? null,
       input.end_date ?? null,
       input.remind_time ?? null,
+      input.note ?? null,
     ],
   );
   return rows[0] ?? (await getTask(id))!;

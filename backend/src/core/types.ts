@@ -8,6 +8,7 @@ export interface Task {
   start_date: string | null;
   end_date: string | null;
   remind_time: string | null; // 'HH:MM'
+  note: string | null; // 备注(自由文本)
   archived: boolean;
   created_at: string; // ISO8601
 }

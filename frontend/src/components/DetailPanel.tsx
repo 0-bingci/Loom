@@ -13,8 +13,9 @@ import {
 import { useEffect, useState } from "react";
 import { selectTask, toggleDone } from "../app/dashboardSlice";
 import { useAppDispatch, useAppSelector } from "../app/store";
+import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
-import type { DashboardItem } from "../types";
+import type { DashboardItem, Task } from "../types";
 import TaskEditor from "./TaskEditor";
 
 function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; children: React.ReactNode }) {
@@ -28,6 +29,38 @@ function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; childre
 }
 
 const pill = "inline-flex items-center gap-1.5 rounded-lg px-[11px] py-1 text-[13px]";
+
+/** 任务备注:失焦自动保存(离线走发件箱) */
+function NoteBox({ task }: { task: Task }) {
+  const [note, setNote] = useState(task.note ?? "");
+  const [saved, setSaved] = useState(false);
+
+  // 切换任务时装入对应备注
+  useEffect(() => {
+    setNote(task.note ?? "");
+    setSaved(false);
+  }, [task.id]);
+
+  const save = async () => {
+    if (note === (task.note ?? "")) return;
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${task.id}`, body: { note: note || null } });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <div className="mt-[18px] border-t border-line pt-4 text-[13px] text-ink3">
+      备注{saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => void save()}
+        placeholder="写点什么…(离开输入框自动保存)"
+        className="mt-2 min-h-[60px] w-full resize-none border-0 bg-transparent font-[inherit] text-ink outline-none"
+      />
+    </div>
+  );
+}
 
 function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => void }) {
   const dispatch = useAppDispatch();
@@ -120,13 +153,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           <span className="text-ink2">默认(清单规划中)</span>
         </Prop>
 
-        <div className="mt-[18px] border-t border-line pt-4 text-[13px] text-ink3">
-          备注
-          <textarea
-            placeholder="写点什么…(暂存本地,后端笔记功能规划中)"
-            className="mt-2 min-h-[60px] w-full resize-none border-0 bg-transparent font-[inherit] text-ink outline-none"
-          />
-        </div>
+        <NoteBox task={t} />
       </div>
       )}
 

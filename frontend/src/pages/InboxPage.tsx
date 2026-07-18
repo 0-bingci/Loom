@@ -288,6 +288,7 @@ function blankTask(id: string, title: string): Task {
     start_date: null,
     end_date: null,
     remind_time: null,
+    note: null,
     archived: false,
     created_at: new Date().toISOString(),
   };

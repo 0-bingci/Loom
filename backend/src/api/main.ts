@@ -59,6 +59,7 @@ const taskFields = {
   start_date: dateStr.nullish(),
   end_date: dateStr.nullish(),
   remind_time: timeStr.nullish(),
+  note: z.string().nullish(),
 };
 
 // id 只允许在创建时带(幂等重放);PATCH 不许改主键。
