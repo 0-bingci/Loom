@@ -39,6 +39,7 @@ export default function InboxPage() {
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"note" | "task">("note"); // 随手记的更多,碎片是默认
   const [error, setError] = useState(false);
+  const [schedulingId, setSchedulingId] = useState<string | null>(null); // 正在挑日期的待办
 
   const load = useCallback(async () => {
     try {
@@ -84,11 +85,19 @@ export default function InboxPage() {
     setEntries((prev) => prev.filter((x) => x.id !== e.id));
   };
 
-  const scheduleToday = async (e: Entry) => {
+  const scheduleTo = async (e: Entry, date: string) => {
+    setSchedulingId(null);
     setEntries((prev) => prev.filter((x) => x.id !== e.id));
-    await sendOrQueue({ method: "PATCH", path: `/tasks/${e.id}`, body: { due_date: today } });
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${e.id}`, body: { due_date: date } });
     void dispatch(syncNow());
   };
+
+  const tomorrow = (() => {
+    if (!today) return "";
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
 
   /** 碎片转待办:建同内容的收集箱任务,删掉原碎片 */
   const noteToTask = async (e: Entry) => {
@@ -150,7 +159,8 @@ export default function InboxPage() {
           </div>
         ) : (
           entries.map((e) => (
-            <div key={e.id} className="row-in group flex items-start gap-3 rounded-[10px] px-3.5 py-[11px] hover:bg-surface">
+            <div key={e.id} className="row-in group rounded-[10px] px-3.5 py-[11px] hover:bg-surface">
+            <div className="flex items-start gap-3">
               {e.kind === "task" ? (
                 <button
                   aria-label="完成"
@@ -173,12 +183,16 @@ export default function InboxPage() {
               <div className="flex shrink-0 items-center gap-1.5">
                 {e.kind === "task" ? (
                   <button
-                    onClick={() => void scheduleToday(e)}
-                    title="安排到今天"
-                    className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] text-ink2 hover:border-accent hover:text-accent"
+                    onClick={() => setSchedulingId(schedulingId === e.id ? null : e.id)}
+                    title="安排日期"
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] ${
+                      schedulingId === e.id
+                        ? "border-accent text-accent"
+                        : "border-line text-ink2 hover:border-accent hover:text-accent"
+                    }`}
                   >
                     <IconCalendarPlus size={13} />
-                    <span className="hidden md:inline">安排到今天</span>
+                    <span className="hidden md:inline">安排</span>
                   </button>
                 ) : (
                   <button
@@ -194,6 +208,32 @@ export default function InboxPage() {
                   <IconTrash size={15} />
                 </button>
               </div>
+            </div>
+
+            {schedulingId === e.id && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8 text-xs">
+                <span className="text-ink3">安排到</span>
+                <button
+                  onClick={() => void scheduleTo(e, today)}
+                  className="rounded-md border border-line px-2.5 py-1 text-ink2 hover:border-accent hover:text-accent"
+                >
+                  今天
+                </button>
+                <button
+                  onClick={() => void scheduleTo(e, tomorrow)}
+                  className="rounded-md border border-line px-2.5 py-1 text-ink2 hover:border-accent hover:text-accent"
+                >
+                  明天
+                </button>
+                <input
+                  type="date"
+                  min={today}
+                  onChange={(ev) => ev.target.value && void scheduleTo(e, ev.target.value)}
+                  className="rounded-md border border-line px-1.5 py-0.5 text-xs text-ink2"
+                />
+                <span className="text-ink3">选个日期,它会出现在那天的视图里</span>
+              </div>
+            )}
             </div>
           ))
         )}
