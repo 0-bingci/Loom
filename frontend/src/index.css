@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* 原型的暖米色系统 → Tailwind 主题 token(bg-bg / text-ink2 / border-line …) */
+@theme {
+  --color-bg: #faf9f6;
+  --color-rail: #26251f;
+  --color-rail-hover: #35342c;
+  --color-sidebar: #f3f1ec;
+  --color-sidebar-hover: #eae7df;
+  --color-surface: #ffffff;
+  --color-line: #e8e5dd;
+  --color-line2: #dad6cb;
+  --color-ink: #26251f;
+  --color-ink2: #6e6b62;
+  --color-ink3: #a6a296;
+  --color-accent: #1f7a6b;
+  --color-accent-soft: #e2efeb;
+  --color-over: #b4472e;
+  --color-over-soft: #f7e9e3;
+  --color-over-row: #fcf6f3;
+  --color-over-row-hover: #fbf1ec;
+  --color-rec: #6a5aa0;
+  --color-rec-soft: #ece8f5;
+  --font-wordmark: "Fraunces", serif;
+}
+
+html, body, #root { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--color-ink);
+  background: var(--color-bg);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-thumb { background: #ded9ce; border-radius: 9px; border: 2px solid var(--color-bg); }
+
+/* 列表行进场(react-bits 风格的轻动效,纯 CSS 实现) */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.row-in { animation: row-in 0.25s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

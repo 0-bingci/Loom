@@ -1,0 +1,14 @@
+{
+  "name": "loom",
+  "private": true,
+  "description": "根目录只做开发编排;真正的包在 backend/ 和 frontend/",
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,yellow,green \"npm --prefix backend run api:dev\" \"npm --prefix backend run worker:dev\" \"npm --prefix frontend run dev\"",
+    "migrate": "npm --prefix backend run migrate",
+    "test": "npm --prefix backend test",
+    "typecheck": "npm --prefix backend run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

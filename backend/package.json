@@ -1,0 +1,36 @@
+{
+  "name": "loom",
+  "version": "0.1.0",
+  "description": "个人信息管理系统 — 待办 + 按日期算出的 dashboard + 提醒 worker + API",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
+    "api": "tsx --env-file-if-exists=.env src/api/main.ts",
+    "worker": "tsx --env-file-if-exists=.env src/worker/main.ts",
+    "api:dev": "tsx watch --env-file-if-exists=.env src/api/main.ts",
+    "worker:dev": "tsx watch --env-file-if-exists=.env src/worker/main.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14",
+    "luxon": "^3.5.0",
+    "pg": "^8.13.1",
+    "ulid": "^2.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.4.2",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

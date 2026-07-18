@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom · 原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6; --rail:#26251F; --sidebar:#F3F1EC; --surface:#FFFFFF;
+    --border:#E8E5DD; --border-2:#DAD6CB;
+    --text:#26251F; --text-2:#6E6B62; --text-3:#A6A296;
+    --accent:#1F7A6B; --accent-soft:#E2EFEB;
+    --over:#B4472E; --over-soft:#F7E9E3;
+    --rec:#6A5AA0; --rec-soft:#ECE8F5;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--text); background:var(--bg);
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .app{display:grid; grid-template-columns:56px 246px 1fr 336px; height:100vh; overflow:hidden;}
+
+  /* ===== rail ===== */
+  .rail{background:var(--rail); display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px;}
+  .rail .mark{width:34px; height:34px; border-radius:9px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; color:#fff; margin-bottom:10px; font-size:18px;}
+  .rail button{width:38px; height:38px; border:0; background:transparent; color:#8C887C;
+    border-radius:9px; cursor:pointer; font-size:19px; display:flex; align-items:center; justify-content:center;
+    transition:background .15s,color .15s;}
+  .rail button:hover{background:#35342C; color:#CFCabb;}
+  .rail button.on{background:#35342C; color:#fff;}
+  .rail .sp{flex:1;}
+
+  /* ===== sidebar ===== */
+  .side{background:var(--sidebar); border-right:1px solid var(--border); overflow-y:auto; padding:16px 10px;}
+  .wordmark{font-family:"Fraunces",serif; font-size:22px; font-weight:500; letter-spacing:.5px;
+    padding:2px 8px 16px; display:flex; align-items:baseline; gap:8px;}
+  .wordmark small{font-family:inherit; font-size:11px; color:var(--text-3); letter-spacing:0;}
+  .nav{display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:8px; cursor:pointer;
+    color:var(--text); position:relative; transition:background .12s;}
+  .nav:hover{background:#EAE7DF;}
+  .nav.on{background:#EAE7DF; font-weight:500;}
+  .nav.on::before{content:""; position:absolute; left:-10px; top:8px; bottom:8px; width:3px;
+    background:var(--accent); border-radius:0 3px 3px 0;}
+  .nav i{font-size:17px; color:var(--text-2); width:18px; text-align:center;}
+  .nav .lbl{flex:1;}
+  .nav .ct{font-size:12px; color:var(--text-3);}
+  .grp{font-size:11px; color:var(--text-3); letter-spacing:1px; padding:18px 9px 6px;}
+  .dot{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
+  .hint{font-size:12px; color:var(--text-3); line-height:1.6; padding:4px 9px 0;}
+  .upgrade{margin-top:14px; padding:9px 11px; border-radius:8px; border:1px dashed var(--border-2);
+    color:var(--text-2); font-size:12.5px; display:flex; align-items:center; gap:8px; cursor:pointer;}
+
+  /* ===== main ===== */
+  .main{background:var(--bg); overflow-y:auto; display:flex; flex-direction:column;}
+  .mhead{padding:20px 28px 6px; display:flex; align-items:flex-end; justify-content:space-between;}
+  .mhead h1{font-size:20px; font-weight:500; display:flex; align-items:baseline; gap:10px;}
+  .mhead h1 span{font-size:13px; color:var(--text-3); font-weight:400;}
+  .mtools{display:flex; gap:4px; color:var(--text-3);}
+  .mtools button{border:0; background:transparent; color:inherit; font-size:18px; cursor:pointer;
+    width:30px; height:30px; border-radius:7px;}
+  .mtools button:hover{background:var(--sidebar); color:var(--text-2);}
+
+  .weave{height:5px; margin:12px 28px 4px; border-radius:99px; background:#EDEAE2; overflow:hidden; display:flex;}
+  .weave i{display:block; height:100%; background:var(--accent); transition:width .25s ease;}
+  .weave .r{background:var(--rec); opacity:.55;}
+  .prog{padding:0 28px 8px; font-size:12px; color:var(--text-3);}
+
+  .addbar{margin:6px 28px 4px; padding:11px 14px; border:1px solid var(--border); border-radius:10px;
+    color:var(--text-3); background:var(--surface); display:flex; align-items:center; gap:9px; cursor:text; font-size:13.5px;}
+  .addbar i{font-size:16px;}
+
+  .glabel{padding:16px 28px 6px; font-size:12px; letter-spacing:.5px; display:flex; align-items:center; gap:7px;}
+  .glabel .g-over{color:var(--over); font-weight:500;}
+  .glabel .g-td{color:var(--text-2); font-weight:500;}
+  .glabel small{color:var(--text-3); font-weight:400;}
+
+  .list{padding:0 20px;}
+  .row{display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:10px; cursor:pointer;
+    border:1px solid transparent; transition:background .12s,border-color .12s;}
+  .row:hover{background:var(--surface);}
+  .row.sel{background:var(--surface); border-color:var(--border-2);}
+  .row.over{background:#FCF6F3;}
+  .row.over:hover{background:#FBF1EC;}
+  .cbx{width:19px; height:19px; border-radius:6px; border:1.6px solid var(--border-2); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; transition:.12s;}
+  .cbx:hover{border-color:var(--accent);}
+  .row.done .cbx{background:var(--accent); border-color:var(--accent);}
+  .row.over .cbx{border-color:#D89A86;}
+  .body{flex:1; min-width:0;}
+  .title{font-size:14.5px; line-height:1.35;}
+  .row.done .title{color:var(--text-3); text-decoration:line-through;}
+  .meta{font-size:12px; color:var(--text-2); margin-top:2px; display:flex; align-items:center; gap:5px;}
+  .meta.o{color:var(--over);}
+  .badge{font-size:11px; padding:2px 8px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;}
+  .b-rec{background:var(--rec-soft); color:var(--rec);}
+  .b-once{background:#EFEDE6; color:var(--text-2);}
+
+  /* ===== detail ===== */
+  .detail{background:var(--surface); border-left:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column;}
+  .dhead{padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; color:var(--text-3); font-size:13px;}
+  .dhead .r{margin-left:auto; display:flex; gap:6px;}
+  .dhead button{border:0; background:transparent; color:var(--text-3); font-size:17px; cursor:pointer;}
+  .dbody{padding:20px; flex:1;}
+  .crumb{font-size:12px; color:var(--text-3); margin-bottom:12px;}
+  .dtitle-row{display:flex; align-items:flex-start; gap:12px; margin-bottom:20px;}
+  .dtitle-row .cbx{width:21px; height:21px; margin-top:2px;}
+  .dtitle{font-size:19px; font-weight:500; line-height:1.35;}
+  .prop{display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--border);}
+  .prop i{font-size:17px; color:var(--text-3); width:20px; text-align:center;}
+  .prop .k{color:var(--text-2); width:66px; font-size:13px;}
+  .prop .v{flex:1; font-size:13.5px;}
+  .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:8px; font-size:13px;
+    background:var(--accent-soft); color:var(--accent);}
+  .pill.rec{background:var(--rec-soft); color:var(--rec);}
+  .pill.muted{background:#EFEDE6; color:var(--text-2);}
+  .notes{margin-top:18px; padding-top:16px; border-top:1px solid var(--border); color:var(--text-3); font-size:13px;}
+  .notes textarea{width:100%; border:0; resize:none; outline:0; font:inherit; color:var(--text); background:transparent;
+    margin-top:8px; min-height:60px;}
+  .dfoot{padding:12px 20px; border-top:1px solid var(--border); color:var(--text-3); font-size:12px; display:flex; align-items:center; gap:7px;}
+  ::-webkit-scrollbar{width:9px;} ::-webkit-scrollbar-thumb{background:#DED9CE; border-radius:9px; border:2px solid var(--bg);}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- rail -->
+  <nav class="rail" aria-label="主导航">
+    <div class="mark"><i class="ti ti-needle-thread"></i></div>
+    <button class="on" aria-label="任务" title="任务"><i class="ti ti-checkbox"></i></button>
+    <button aria-label="日历" title="日历"><i class="ti ti-calendar"></i></button>
+    <button aria-label="时间线" title="时间线"><i class="ti ti-timeline"></i></button>
+    <button aria-label="搜索" title="搜索"><i class="ti ti-search"></i></button>
+    <div class="sp"></div>
+    <button aria-label="同步" title="同步"><i class="ti ti-refresh"></i></button>
+    <button aria-label="提醒" title="提醒"><i class="ti ti-bell"></i></button>
+    <button aria-label="帮助" title="帮助"><i class="ti ti-help"></i></button>
+  </nav>
+
+  <!-- sidebar -->
+  <aside class="side">
+    <div class="wordmark">Loom <small>把一天织成一处</small></div>
+
+    <div class="nav on"><i class="ti ti-sun"></i><span class="lbl">今天</span><span class="ct">6</span></div>
+    <div class="nav"><i class="ti ti-calendar-week"></i><span class="lbl">最近 7 天</span><span class="ct">9</span></div>
+    <div class="nav"><i class="ti ti-inbox"></i><span class="lbl">收集箱</span><span class="ct">2</span></div>
+
+    <div class="grp">清单</div>
+    <div class="nav"><span class="dot" style="background:#D98B3F"></span><span class="lbl">个人</span><span class="ct">2</span></div>
+    <div class="nav"><span class="dot" style="background:var(--accent)"></span><span class="lbl">成长</span><span class="ct">4</span></div>
+    <div class="nav"><span class="dot" style="background:#6A5AA0"></span><span class="lbl">信息流</span><span class="ct">7</span></div>
+
+    <div class="grp">标签</div>
+    <div class="nav"><i class="ti ti-hash"></i><span class="lbl">健康</span></div>
+    <div class="nav"><i class="ti ti-hash"></i><span class="lbl">复盘</span></div>
+
+    <div class="grp">&nbsp;</div>
+    <div class="nav"><i class="ti ti-circle-check"></i><span class="lbl">已完成</span></div>
+    <div class="nav"><i class="ti ti-trash"></i><span class="lbl">垃圾桶</span></div>
+
+    <div class="upgrade"><i class="ti ti-plus"></i> 新建清单</div>
+  </aside>
+
+  <!-- main -->
+  <main class="main">
+    <div class="mhead">
+      <h1>今天 <span>7 月 21 日 · 周二</span></h1>
+      <div class="mtools">
+        <button aria-label="排序"><i class="ti ti-arrows-sort"></i></button>
+        <button aria-label="更多"><i class="ti ti-dots"></i></button>
+      </div>
+    </div>
+
+    <div class="weave"><i id="w-done" style="width:9%"></i><i class="r" id="w-rec" style="width:0"></i></div>
+    <div class="prog"><span id="prog">完成 1 / 6</span> · 今天织进 6 条</div>
+
+    <div class="addbar"><i class="ti ti-plus"></i> 添加任务，输入 # 选标签</div>
+
+    <div class="glabel"><span class="g-over">逾期</span><small>未做完，一直挂着</small></div>
+    <div class="list" id="list-over"></div>
+
+    <div class="glabel"><span class="g-td">今天</span></div>
+    <div class="list" id="list-today"></div>
+  </main>
+
+  <!-- detail -->
+  <aside class="detail">
+    <div class="dhead">
+      <span><i class="ti ti-square" style="vertical-align:-2px"></i> 未完成</span>
+      <div class="r">
+        <button aria-label="标记优先"><i class="ti ti-flag"></i></button>
+        <button aria-label="更多"><i class="ti ti-dots"></i></button>
+      </div>
+    </div>
+    <div class="dbody" id="detail"></div>
+    <div class="dfoot"><i class="ti ti-bell"></i> 到点会写入提醒，客户端从这里拉取</div>
+  </aside>
+
+</div>
+
+<script>
+const tasks = {
+  report:{title:"提交季度报告", list:"个人", kind:"once", due:"7 月 17 日 · 上周五", overdue:"逾期 3 天", remind:null, done:false},
+  meditate:{title:"晨间冥想", list:"成长", kind:"recurring", rule:"每日", remind:"07:00", done:true},
+  gym:{title:"健身房", list:"成长", kind:"recurring", rule:"每周 周二、周四", window:"7 月 1 日 – 7 月 31 日", remind:"18:00", done:false},
+  dentist:{title:"预约牙医", list:"个人", kind:"once", due:"今天", remind:"14:00", done:false},
+  water:{title:"喝水 2L", list:"成长", kind:"recurring", rule:"每日", remind:null, done:false},
+  english:{title:"读英语 30 分钟", list:"成长", kind:"recurring", rule:"每日", remind:"21:00", done:false},
+};
+
+const overList=[["report"]];
+const todayList=[["meditate"],["gym"],["dentist"],["water"],["english"]];
+
+function rowHTML(id){
+  const t=tasks[id];
+  const over=!!t.overdue;
+  const badge = t.kind==="recurring"
+    ? `<span class="badge b-rec"><i class="ti ti-repeat"></i>${t.rule==="每日"?"每日":"周二·周四·本月"}</span>`
+    : `<span class="badge b-once">一次性</span>`;
+  let meta="";
+  if(over) meta=`<div class="meta o"><i class="ti ti-clock"></i>${t.due} · ${t.overdue}</div>`;
+  else if(t.remind) meta=`<div class="meta"><i class="ti ti-clock"></i>${t.remind}</div>`;
+  return `<div class="row ${over?'over':''} ${t.done?'done':''}" data-id="${id}">
+    <div class="cbx">${t.done?'<i class="ti ti-check"></i>':''}</div>
+    <div class="body"><div class="title">${t.title}</div>${meta}</div>
+    ${badge}
+  </div>`;
+}
+
+document.getElementById("list-over").innerHTML   = overList.map(r=>rowHTML(r[0])).join("");
+document.getElementById("list-today").innerHTML  = todayList.map(r=>rowHTML(r[0])).join("");
+
+function renderDetail(id){
+  const t=tasks[id];
+  let rows="";
+  if(t.kind==="recurring"){
+    rows+=`<div class="prop"><i class="ti ti-repeat"></i><span class="k">循环</span><span class="v"><span class="pill rec"><i class="ti ti-repeat"></i>${t.rule}</span></span></div>`;
+    if(t.window) rows+=`<div class="prop"><i class="ti ti-calendar-stats"></i><span class="k">生效区间</span><span class="v"><span class="pill muted">${t.window}</span></span></div>`;
+  } else {
+    rows+=`<div class="prop"><i class="ti ti-calendar"></i><span class="k">日期</span><span class="v"><span class="pill ${t.overdue?'':'muted'}" ${t.overdue?'style="background:var(--over-soft);color:var(--over)"':''}>${t.due}${t.overdue?' · '+t.overdue:''}</span></span></div>`;
+  }
+  rows+=`<div class="prop"><i class="ti ti-bell"></i><span class="k">提醒</span><span class="v">${t.remind?`<span class="pill">${t.remind}</span>`:'<span style="color:var(--text-3)">未设置</span>'}</span></div>`;
+  rows+=`<div class="prop"><i class="ti ti-list"></i><span class="k">清单</span><span class="v" style="color:var(--text-2)">${t.list}</span></div>`;
+
+  document.getElementById("detail").innerHTML=`
+    <div class="crumb">${t.list} ›</div>
+    <div class="dtitle-row">
+      <div class="cbx" style="${t.done?'background:var(--accent);border-color:var(--accent)':''}">${t.done?'<i class="ti ti-check"></i>':''}</div>
+      <div class="dtitle">${t.title}</div>
+    </div>
+    ${rows}
+    <div class="notes">备注<textarea placeholder="写点什么…"></textarea></div>`;
+}
+
+let selected="gym";
+function select(id){
+  selected=id;
+  document.querySelectorAll(".row").forEach(r=>r.classList.toggle("sel", r.dataset.id===id));
+  renderDetail(id);
+}
+
+function updateProgress(){
+  const ids=[...overList,...todayList].map(r=>r[0]);
+  const total=ids.length;
+  const done=ids.filter(i=>tasks[i].done).length;
+  document.getElementById("prog").textContent=`完成 ${done} / ${total}`;
+  document.getElementById("w-done").style.width=Math.round(done/total*100)+"%";
+}
+
+document.querySelectorAll(".row").forEach(row=>{
+  const id=row.dataset.id;
+  row.addEventListener("click",e=>{
+    if(e.target.closest(".cbx")){
+      tasks[id].done=!tasks[id].done;
+      row.classList.toggle("done", tasks[id].done);
+      row.querySelector(".cbx").innerHTML=tasks[id].done?'<i class="ti ti-check"></i>':'';
+      updateProgress();
+      if(selected===id) renderDetail(id);
+      return;
+    }
+    select(id);
+  });
+});
+
+select("gym");
+updateProgress();
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.2.0/tabler-icons.min.css">
+</body>
+</html>

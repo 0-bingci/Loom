@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>loom</title>
+<style>
+  :root {
+    --bg: #fafafa; --card: #fff; --text: #202020; --muted: #808080;
+    --line: #eee; --accent: #4f6df5; --danger: #d1453b; --ok: #4a9d6e;
+    --hover: #f5f5f5; --warn-bg: #fff3cd; --warn-text: #7a5d00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1e1e1e; --card: #282828; --text: #e8e8e8; --muted: #8a8a8a;
+            --line: #363636; --danger: #e0665d; --hover: #303030;
+            --warn-bg: #4a3f1a; --warn-text: #e8d48a; }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Microsoft YaHei", sans-serif;
+         max-width: 660px; margin: 0 auto; padding: 32px 20px; }
+
+  /* 离线横幅 */
+  #offlineBar { position: fixed; top: 0; left: 0; right: 0; background: var(--warn-bg); color: var(--warn-text);
+                text-align: center; font-size: 13px; padding: 6px 12px; z-index: 10; }
+
+  header h1 { font-size: 22px; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  form.add { display: flex; gap: 8px; margin: 20px 0 8px; }
+  form.add input[type=text] { flex: 1; background: var(--card); border: 1px solid var(--line); color: var(--text);
+                              border-radius: 8px; padding: 9px 12px; font: inherit; }
+  form.add input[type=text]:focus { outline: none; border-color: var(--accent); }
+  form.add select, form.add input[type=time] { background: var(--card); border: 1px solid var(--line);
+                                               color: var(--muted); border-radius: 8px; padding: 8px; font: inherit; font-size: 13px; }
+  form.add button { background: var(--danger); color: #fff; border: none; border-radius: 8px;
+                    padding: 8px 18px; font: inherit; cursor: pointer; }
+
+  section { margin-top: 22px; }
+  section > h2 { font-size: 13px; font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  section.overdue > h2 { color: var(--danger); }
+  section .count { color: var(--muted); font-weight: normal; margin-left: 6px; }
+
+  .item { display: flex; align-items: center; gap: 12px; padding: 11px 6px; border-bottom: 1px solid var(--line); }
+  .item:hover { background: var(--hover); }
+  .item.pendingSync { opacity: .65; }
+
+  .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--muted); flex: none;
+           cursor: pointer; display: grid; place-items: center; color: transparent; font-size: 12px;
+           transition: all .15s; background: none; padding: 0; }
+  .check:hover { color: var(--muted); }
+  .item.overdue-item .check { border-color: var(--danger); }
+  .check.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+  .body { flex: 1; min-width: 0; }
+  .title { display: block; }
+  .item.done .title { color: var(--muted); text-decoration: line-through; }
+  .meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; margin-top: 1px; }
+  .meta .due-red { color: var(--danger); }
+
+  .week { display: flex; gap: 5px; flex: none; }
+  .week .day { display: grid; gap: 3px; justify-items: center; }
+  .week .lbl { font-size: 10px; color: var(--muted); }
+  .week .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .week .dot.skip { background: var(--line); opacity: .4; }
+  .week .dot.miss { border: 1.5px solid var(--muted); }
+  .week .dot.hit  { background: var(--ok); }
+  .week .day.today .lbl { color: var(--accent); font-weight: 700; }
+  .week .day.today .dot { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .empty { padding: 14px 6px; color: var(--muted); font-size: 14px; }
+
+  .notif { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-bottom: 1px solid var(--line); }
+  .notif .date { font-size: 12px; color: var(--muted); }
+  .notif button { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 6px;
+                  padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  .notif button:hover { color: var(--text); border-color: var(--muted); }
+
+  #tokenBox { margin-top: 40px; text-align: center; }
+  #tokenBox input { width: 260px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+                    background: var(--card); color: var(--text); font: inherit; }
+  #tokenBox button { padding: 9px 16px; border-radius: 8px; border: none; background: var(--accent);
+                     color: #fff; cursor: pointer; font: inherit; }
+  .err { color: var(--danger); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="offlineBar" hidden></div>
+
+<header>
+  <h1>今天</h1>
+  <div class="sub" id="dateLabel"></div>
+</header>
+
+<div id="tokenBox" hidden>
+  <p style="margin-bottom:8px">输入 API token(存在浏览器本地)</p>
+  <input id="tokenInput" type="password" placeholder="LOOM_API_TOKEN">
+  <button onclick="saveToken()">进入</button>
+  <div class="err" id="tokenErr"></div>
+</div>
+
+<div id="app" hidden>
+  <form class="add" onsubmit="addTask(event)">
+    <input type="text" id="newTitle" placeholder="添加任务,回车即建…" required>
+    <select id="newKind">
+      <option value="once">今天</option>
+      <option value="daily">每天</option>
+    </select>
+    <input type="time" id="newRemind" title="提醒时间(可空)">
+    <button>添加</button>
+  </form>
+
+  <section class="overdue" id="overdueSec" hidden>
+    <h2>逾期<span class="count" id="overdueCount"></span></h2>
+    <div id="overdueList"></div>
+  </section>
+
+  <section class="today">
+    <h2>今天<span class="count" id="todayCount"></span></h2>
+    <div id="todayList"></div>
+  </section>
+
+  <section class="bell">
+    <h2>🔔 提醒<span class="count" id="notifCount"></span></h2>
+    <div id="notifList"></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = localStorage.getItem("loom_token") || "";
+
+/* ───────── 离线基建:客户端 ULID + 发件箱 + 快照缓存 ─────────
+   原则:保存先发生在本地,同步是后台的事。断网时改动进 outbox 队列
+   并乐观更新缓存快照;网络恢复后按序补发(创建带客户端 ULID,服务端幂等去重)。 */
+
+function ulid() {
+  const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  let t = Date.now(), time = "";
+  for (let i = 0; i < 10; i++) { time = B32[t % 32] + time; t = Math.floor(t / 32); }
+  const rnd = crypto.getRandomValues(new Uint8Array(16));
+  let rand = "";
+  for (let i = 0; i < 16; i++) rand += B32[rnd[i] % 32];
+  return time + rand;
+}
+
+const loadJSON = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
+let outbox = loadJSON("loom_outbox", []);
+let snap = loadJSON("loom_snap", null); // {dash, weekDays, weekMap, notifs}
+let offline = false;
+
+const saveOutbox = () => localStorage.setItem("loom_outbox", JSON.stringify(outbox));
+const saveSnap = () => localStorage.setItem("loom_snap", JSON.stringify(snap));
+
+function setOffline(v) {
+  offline = v;
+  const bar = $("offlineBar");
+  bar.hidden = !v;
+  if (v) bar.textContent = `⚠ 离线中 — 改动已保存在本地,恢复后自动同步` +
+                           (outbox.length ? `(${outbox.length} 条待同步)` : "");
+}
+
+async function rawFetch(method, path, body) {
+  return fetch(path, {
+    method,
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/* 写操作统一入口:在线直发;发不出去(断网/服务挂)→ 入队,由调用方做乐观更新 */
+async function send(method, path, body) {
+  try {
+    const res = await rawFetch(method, path, body);
+    if (res.status === 401) { showTokenBox("token 不对"); throw new Error("unauthorized"); }
+    return res;
+  } catch (e) {
+    if (e.message === "unauthorized") throw e;
+    outbox.push({ method, path, body });
+    saveOutbox();
+    setOffline(true);
+    return null;
+  }
+}
+
+/* 补发队列:任何 HTTP 响应都算"送达"(4xx 是脏数据,丢弃并告警,不能堵死队列) */
+async function flushOutbox() {
+  while (outbox.length) {
+    const op = outbox[0];
+    let res;
+    try { res = await rawFetch(op.method, op.path, op.body); }
+    catch { return false; } // 还是断着,下次再试
+    if (!res.ok && res.status !== 404) console.warn("outbox 丢弃失败操作", op, res.status);
+    outbox.shift();
+    saveOutbox();
+    setOffline(offline); // 刷新横幅计数
+  }
+  return true;
+}
+
+async function getJSON(path) {
+  const res = await rawFetch("GET", path);
+  if (res.status === 401) { showTokenBox("token 不对"); throw new Error("unauthorized"); }
+  return res.json();
+}
+
+/* ───────── 视图 ───────── */
+
+function showTokenBox(err) {
+  $("app").hidden = true; $("tokenBox").hidden = false;
+  $("tokenErr").textContent = err || "";
+}
+function saveToken() {
+  token = $("tokenInput").value.trim();
+  localStorage.setItem("loom_token", token);
+  boot();
+}
+
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+const dstr = (d) => d.toISOString().slice(0, 10);
+const localNow = () => new Date(Date.now() + 8 * 3600e3);
+
+function weekStrip(taskId, weekDays, weekMap, today) {
+  const wrap = document.createElement("div");
+  wrap.className = "week";
+  for (const d of weekDays) {
+    const done = weekMap[taskId]?.[d];
+    const day = document.createElement("div");
+    day.className = "day" + (d === today ? " today" : "");
+    const cls = done === undefined ? "skip" : done ? "hit" : "miss";
+    day.innerHTML = `<span class="lbl">${WD[new Date(d).getUTCDay()]}</span><span class="dot ${cls}"></span>`;
+    wrap.appendChild(day);
+  }
+  return wrap;
+}
+
+function taskRow(it, weekDays, weekMap, today) {
+  const div = document.createElement("div");
+  div.className = "item" + (it.done ? " done" : "") + (it.overdue ? " overdue-item" : "")
+                + (it.pendingSync ? " pendingSync" : "");
+  const btn = document.createElement("button");
+  btn.className = "check" + (it.done ? " on" : "");
+  btn.textContent = "✓";
+  btn.onclick = () => toggleDone(it.task.id, !it.done);
+  div.appendChild(btn);
+
+  const body = document.createElement("div");
+  body.className = "body";
+  const title = document.createElement("span");
+  title.className = "title";
+  title.textContent = it.task.title;
+  body.appendChild(title);
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  if (it.overdue) meta.innerHTML = `<span class="due-red">到期 ${it.task.due_date}</span>`;
+  if (it.task.remind_time) meta.innerHTML += `<span>⏰ ${it.task.remind_time}</span>`;
+  if (it.pendingSync) meta.innerHTML += `<span>待同步</span>`;
+  if (meta.innerHTML) body.appendChild(meta);
+  div.appendChild(body);
+
+  if (it.kind === "recurring") div.appendChild(weekStrip(it.task.id, weekDays, weekMap, today));
+  return div;
+}
+
+function render() {
+  if (!snap) return;
+  const { dash, weekDays, weekMap, notifs } = snap;
+  $("dateLabel").textContent = `${dash.date} 周${WD[new Date(dash.date).getUTCDay()]}`;
+  const titleOf = {};
+  for (const it of dash.items) titleOf[it.task.id] = it.task.title;
+
+  const over = dash.items.filter((it) => it.overdue);
+  const today = dash.items.filter((it) => !it.overdue);
+
+  $("overdueSec").hidden = over.length === 0;
+  $("overdueCount").textContent = over.length || "";
+  const ol = $("overdueList"); ol.innerHTML = "";
+  for (const it of over) ol.appendChild(taskRow(it, weekDays, weekMap, dash.date));
+
+  $("todayCount").textContent = today.length || "";
+  const tl = $("todayList"); tl.innerHTML = "";
+  if (today.length === 0) tl.innerHTML = '<div class="empty">今天没有任务 🎉</div>';
+  for (const it of today) tl.appendChild(taskRow(it, weekDays, weekMap, dash.date));
+
+  const nl = $("notifList"); nl.innerHTML = "";
+  $("notifCount").textContent = notifs.length || "";
+  if (notifs.length === 0) nl.innerHTML = '<div class="empty">没有待处理的提醒</div>';
+  for (const n of notifs) {
+    const div = document.createElement("div");
+    div.className = "notif";
+    const t = document.createElement("span");
+    t.style.flex = "1";
+    t.textContent = titleOf[n.task_id] ?? n.task_id;
+    div.appendChild(t);
+    div.insertAdjacentHTML("beforeend", `<span class="date">${n.date}</span>`);
+    const b = document.createElement("button");
+    b.textContent = "知道了";
+    b.onclick = () => markRead(n.id);
+    div.appendChild(b);
+    nl.appendChild(div);
+  }
+}
+
+async function refresh() {
+  try {
+    await flushOutbox(); // 先把欠的账还了,再拉真相
+    const [dash, notifs] = await Promise.all([getJSON("/dashboard"), getJSON("/notifications?status=pending")]);
+    const weekDays = [];
+    for (let i = 6; i >= 0; i--) weekDays.push(dstr(new Date(localNow().getTime() - i * 86400e3)));
+    const dashes = await Promise.all(weekDays.map((d) => getJSON(`/dashboard?date=${d}`)));
+    const weekMap = {};
+    dashes.forEach((dd, i) => {
+      for (const it of dd.items) if (it.kind === "recurring") (weekMap[it.task.id] ??= {})[weekDays[i]] = it.done;
+    });
+    snap = { dash, weekDays, weekMap, notifs };
+    saveSnap();
+    setOffline(false);
+  } catch (e) {
+    if (e.message === "unauthorized") throw e;
+    setOffline(true); // 拉不到就渲染本地快照
+  }
+  render();
+}
+
+/* ───────── 操作(全部离线可用) ───────── */
+
+async function toggleDone(id, done) {
+  const res = await send("POST", `/tasks/${id}/done`, { done });
+  if (!res && snap) { // 离线:乐观更新快照
+    for (const it of snap.dash.items) if (it.task.id === id) { it.done = done; it.pendingSync = true; }
+    if (snap.weekMap[id]) snap.weekMap[id][snap.dash.date] = done;
+    saveSnap(); render();
+  } else refresh();
+}
+
+async function markRead(id) {
+  const res = await send("POST", `/notifications/${id}/read`, {});
+  if (!res && snap) {
+    snap.notifs = snap.notifs.filter((n) => n.id !== id);
+    saveSnap(); render();
+  } else refresh();
+}
+
+async function addTask(e) {
+  e.preventDefault();
+  const title = $("newTitle").value.trim();
+  const kind = $("newKind").value;
+  const remind = $("newRemind").value || null;
+  const body = kind === "daily"
+    ? { id: ulid(), title, recurrence: "daily", remind_time: remind, due_date: null }
+    : { id: ulid(), title, due_date: dstr(localNow()), recurrence: null, remind_time: remind };
+  const res = await send("POST", "/tasks", body);
+  if (!res && snap) { // 离线:先出现在列表里,标"待同步"
+    snap.dash.items.push({
+      task: { ...body, start_date: null, end_date: null, archived: false },
+      date: snap.dash.date,
+      kind: kind === "daily" ? "recurring" : "once",
+      overdue: false, done: false, done_at: null, pendingSync: true,
+    });
+    saveSnap(); render();
+  } else refresh();
+  $("newTitle").value = ""; $("newRemind").value = "";
+}
+
+/* ───────── 启动 ───────── */
+
+let booted = false;
+async function boot() {
+  if (!token) return showTokenBox();
+  try {
+    await refresh();
+    $("tokenBox").hidden = true; $("app").hidden = false;
+  } catch { return; /* showTokenBox 已处理 */ }
+  if (!booted) {
+    booted = true;
+    setInterval(refresh, 30_000);
+    window.addEventListener("online", refresh); // 网络一恢复立刻补发+刷新
+  }
+}
+boot();
+</script>
+</body>
+</html>

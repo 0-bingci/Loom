@@ -1,0 +1,16 @@
+# 备用:装好 Docker 后可用容器方式起 PG(代码只认 DATABASE_URL,连哪个都一样)。
+# docker compose up -d
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: loom
+      POSTGRES_PASSWORD: loom
+      POSTGRES_DB: loom
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

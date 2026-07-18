@@ -1,0 +1,61 @@
+import { getPool } from "./db.js";
+import { occursOn } from "./recurrence.js";
+import type { DashboardItem, Task } from "./types.js";
+
+// Dashboard 是算出来的,不预生成(设计文档 §5.1)。
+// 核心原则:一次性任务一直追着你直到做完;循环任务"当天有效",错过不累积。
+
+/**
+ * 某天的 dashboard:
+ * - 一次性:due_date ≤ date 且未完成(逾期的一直挂着,不被吞掉)
+ * - 循环:规则匹配 date 且在生效区间内(某天没做不累积,明天是崭新一条)
+ *
+ * 单人系统任务量小,直接取全部活跃任务在 app 层算——循环逻辑只存在于一处(recurrence.ts),
+ * 不在 SQL 里复制一份。
+ */
+export async function getDashboard(date: string): Promise<DashboardItem[]> {
+  const pool = getPool();
+  const { rows: tasks } = await pool.query<Task>("SELECT * FROM tasks WHERE NOT archived");
+
+  // 一次性任务的状态行记在 due_date 上;循环任务记在查询日上。
+  const logDateOf = (t: Task) => (t.recurrence ? date : t.due_date!);
+
+  // 收集箱任务(无 due_date 无 recurrence)不属于任何一天,不进日视图
+  const candidates = tasks.filter((t) =>
+    t.recurrence ? occursOn(t, date) : t.due_date != null && t.due_date <= date,
+  );
+  if (candidates.length === 0) return [];
+
+  // 一把取出所有相关 (task_id, date) 的状态。
+  const { rows: logs } = await pool.query<{
+    task_id: string;
+    date: string;
+    done: boolean;
+    done_at: string | null;
+  }>(
+    `SELECT task_id, date::text, done, done_at FROM task_log
+     WHERE (task_id, date) IN (SELECT unnest($1::text[]), unnest($2::date[]))`,
+    [candidates.map((t) => t.id), candidates.map(logDateOf)],
+  );
+  const logMap = new Map(logs.map((l) => [`${l.task_id}|${l.date}`, l]));
+
+  const items: DashboardItem[] = [];
+  for (const t of candidates) {
+    const log = logMap.get(`${t.id}|${logDateOf(t)}`);
+    const done = log?.done ?? false;
+    // 一次性任务:已完成的不再出现(它已经不追你了)。
+    if (!t.recurrence && done) continue;
+    items.push({
+      task: t,
+      date: logDateOf(t),
+      kind: t.recurrence ? "recurring" : "once",
+      overdue: !t.recurrence && t.due_date! < date,
+      done,
+      done_at: log?.done_at ?? null,
+    });
+  }
+
+  // 逾期的排最前,然后按提醒时间。
+  items.sort((a, b) => Number(b.overdue) - Number(a.overdue));
+  return items;
+}
