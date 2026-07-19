@@ -1,6 +1,7 @@
-import { IconFilter } from "@tabler/icons-react";
+import { IconBellRinging, IconFilter } from "@tabler/icons-react";
 import { useState } from "react";
-import { applySortOrders } from "../app/dashboardSlice";
+import { applySortOrders, toggleDone } from "../app/dashboardSlice";
+import { markRead } from "../app/notificationsSlice";
 import AddBar from "../components/AddBar";
 import DetailPanel from "../components/DetailPanel";
 import TaskRow from "../components/TaskRow";
@@ -8,6 +9,48 @@ import { useAppDispatch, useAppSelector } from "../app/store";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, weekday } from "../lib/format";
 import type { DashboardItem } from "../types";
+
+/** 到点的提醒:顶在今天页最上面,直到你处理它 */
+function ReminderBanner() {
+  const dispatch = useAppDispatch();
+  const notifs = useAppSelector((s) => s.notifications.items);
+  const items = useAppSelector((s) => s.dashboard.items);
+  if (notifs.length === 0) return null;
+
+  const titleOf = (taskId: string) =>
+    items.find((i) => i.task.id === taskId)?.task.title ?? "一个任务";
+  const remindOf = (taskId: string) =>
+    items.find((i) => i.task.id === taskId)?.task.remind_time;
+
+  return (
+    <div className="mx-4 mt-3 rounded-[10px] border border-accent/40 bg-accent-soft md:mx-7">
+      {notifs.map((n) => (
+        <div key={n.id} className="row-in flex items-center gap-2.5 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-accent/20">
+          <IconBellRinging size={17} className="shrink-0 text-accent" />
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">
+            该做「{titleOf(n.task_id)}」了
+            {remindOf(n.task_id) && <span className="text-ink2">(约定 {remindOf(n.task_id)})</span>}
+          </span>
+          <button
+            onClick={() => {
+              void dispatch(toggleDone({ id: n.task_id, done: true }));
+              void dispatch(markRead(n.id));
+            }}
+            className="shrink-0 rounded-md bg-accent px-2.5 py-1 text-xs text-white"
+          >
+            完成
+          </button>
+          <button
+            onClick={() => void dispatch(markRead(n.id))}
+            className="shrink-0 rounded-md border border-accent/40 px-2.5 py-1 text-xs text-accent hover:bg-accent/10"
+          >
+            知道了
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** 今天视图的筛选器:决定"不看什么"。存 localStorage,跨会话持久。 */
 interface TodayFilter {
@@ -179,6 +222,8 @@ export default function TodayPage() {
             )}
           </div>
         </div>
+
+        <ReminderBanner />
 
         {/* 织布进度条(按全量,不受筛选影响) */}
         <div className="mx-4 mt-3 mb-1 flex h-[5px] overflow-hidden rounded-full bg-[#EDEAE2] md:mx-7">
