@@ -1,3 +1,4 @@
+import { config } from "./config.js";
 import { getPool } from "./db.js";
 import { occursOn } from "./recurrence.js";
 import type { DashboardItem, Task } from "./types.js";
@@ -26,16 +27,19 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
   );
   if (candidates.length === 0) return [];
 
-  // 一把取出所有相关 (task_id, date) 的状态。
+  // 一把取出所有相关 (task_id, date) 的状态(done_date = 完成时刻换算到 UTC+8 的日期)。
   const { rows: logs } = await pool.query<{
     task_id: string;
     date: string;
     done: boolean;
     done_at: string | null;
+    done_date: string | null;
   }>(
-    `SELECT task_id, date::text, done, done_at FROM task_log
+    `SELECT task_id, date::text, done, done_at,
+            to_char(done_at AT TIME ZONE $3, 'YYYY-MM-DD') AS done_date
+     FROM task_log
      WHERE (task_id, date) IN (SELECT unnest($1::text[]), unnest($2::date[]))`,
-    [candidates.map((t) => t.id), candidates.map(logDateOf)],
+    [candidates.map((t) => t.id), candidates.map(logDateOf), config.timezone],
   );
   const logMap = new Map(logs.map((l) => [`${l.task_id}|${l.date}`, l]));
 
@@ -43,8 +47,8 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
   for (const t of candidates) {
     const log = logMap.get(`${t.id}|${logDateOf(t)}`);
     const done = log?.done ?? false;
-    // 一次性任务:已完成的不再出现(它已经不追你了)。
-    if (!t.recurrence && done) continue;
+    // 一次性任务:完成"当天"仍显示(误点可就地撤销),之后才不再出现。
+    if (!t.recurrence && done && log?.done_date !== date) continue;
     items.push({
       task: t,
       date: logDateOf(t),
