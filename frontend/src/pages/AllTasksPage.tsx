@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from "../app/store";
 import { api } from "../lib/api";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, fmtRecurrence, fmtWindow } from "../lib/format";
+import { STATUSES, statusMeta, type TaskStatus } from "../lib/status";
 import type { Task } from "../types";
 
 interface TaskWithStatus extends Task {
@@ -48,12 +49,12 @@ export default function AllTasksPage() {
     void load();
   }, [load]);
 
-  const statusOf = (t: TaskWithStatus): { label: string; cls: string } => {
-    if (t.archived) return { label: "已归档", cls: "bg-[#EFEDE6] text-ink3" };
-    if (t.recurrence) return { label: "循环中", cls: "bg-rec-soft text-rec" };
-    if (t.once_done) return { label: "已完成", cls: "bg-accent-soft text-accent" };
-    if (today && t.due_date! < today) return { label: "逾期", cls: "bg-over-soft text-over" };
-    return { label: "进行中", cls: "bg-[#EFEDE6] text-ink2" };
+  const setStatus = async (t: TaskWithStatus, status: TaskStatus) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === t.id ? { ...r, status, once_done: status === "done" } : r)),
+    );
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${t.id}`, body: { status } });
+    void dispatch(syncNow());
   };
 
   const visible = useMemo(() => {
@@ -81,7 +82,9 @@ export default function AllTasksPage() {
   const toggleOnce = (t: TaskWithStatus) => {
     const done = !t.once_done;
     void dispatch(toggleDone({ id: t.id, done, date: t.due_date! }));
-    setRows((prev) => prev.map((r) => (r.id === t.id ? { ...r, once_done: done } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r.id === t.id ? { ...r, once_done: done, status: done ? "done" : "todo" } : r)),
+    );
   };
 
   const setArchived = async (t: TaskWithStatus, archived: boolean) => {
@@ -143,7 +146,8 @@ export default function AllTasksPage() {
               </tr>
             )}
             {visible.map((t) => {
-              const s = statusOf(t);
+              const overdueBadge =
+                !t.recurrence && !t.archived && t.status !== "done" && t.due_date && today && t.due_date < today;
               return (
                 <tr key={t.id} className={`border-b border-line last:border-b-0 hover:bg-bg ${t.archived ? "opacity-55" : ""}`}>
                   <td className={`${td} text-center`}>
@@ -176,7 +180,31 @@ export default function AllTasksPage() {
                   </td>
                   <td className={`${td} text-ink2`}>{t.remind_time ?? "—"}</td>
                   <td className={td}>
-                    <span className={`${pill} ${s.cls}`}>{s.label}</span>
+                    {t.archived ? (
+                      <span className={`${pill} bg-[#EFEDE6] text-ink3`}>已归档</span>
+                    ) : t.recurrence ? (
+                      <span className={`${pill} bg-rec-soft text-rec`}>循环中</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <select
+                          value={t.status}
+                          onChange={(e) => void setStatus(t, e.target.value as TaskStatus)}
+                          className={`cursor-pointer rounded-md border-0 px-1.5 py-0.5 text-[11px] outline-none ${statusMeta(t.status).cls}`}
+                        >
+                          <optgroup label="推进线">
+                            {STATUSES.filter((s) => s.family === "推进线").map((s) => (
+                              <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="停靠区">
+                            {STATUSES.filter((s) => s.family === "停靠区").map((s) => (
+                              <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                          </optgroup>
+                        </select>
+                        {overdueBadge && <span className={`${pill} bg-over-soft text-over`}>逾期</span>}
+                      </span>
+                    )}
                   </td>
                   <td className={`${td} whitespace-nowrap text-ink3`}>{fmtDate(t.created_at.slice(0, 10))}</td>
                   <td className={`${td} whitespace-nowrap`}>

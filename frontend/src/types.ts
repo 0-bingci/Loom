@@ -9,6 +9,8 @@ export interface Task {
   end_date: string | null;
   remind_time: string | null;
   note: string | null; // 备注(自由文本)
+  /** 六态两族;仅非循环任务有意义 */
+  status: import("./lib/status").TaskStatus;
   archived: boolean;
   created_at: string;
 }

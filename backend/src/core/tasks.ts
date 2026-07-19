@@ -1,6 +1,7 @@
 import { ulid } from "ulid";
+import { todayLocal } from "./dates.js";
 import { getPool } from "./db.js";
-import type { Task } from "./types.js";
+import type { Task, TaskStatus } from "./types.js";
 
 // 任务定义的 CRUD。自有数据,完整增删改查(设计文档 §1.4)。
 
@@ -14,6 +15,7 @@ export interface CreateTaskInput {
   end_date?: string | null;
   remind_time?: string | null;
   note?: string | null;
+  status?: TaskStatus;
 }
 
 export interface UpdateTaskInput {
@@ -24,6 +26,7 @@ export interface UpdateTaskInput {
   end_date?: string | null;
   remind_time?: string | null;
   note?: string | null;
+  status?: TaskStatus;
   archived?: boolean;
 }
 
@@ -31,8 +34,8 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const id = input.id ?? ulid();
   // ON CONFLICT DO NOTHING + 回读:同 id 重放时返回已存在的那条(以先到的为准),不报错不重复。
   const { rows } = await getPool().query<Task>(
-    `INSERT INTO tasks (id, title, due_date, recurrence, start_date, end_date, remind_time, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO tasks (id, title, due_date, recurrence, start_date, end_date, remind_time, note, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (id) DO NOTHING
      RETURNING *`,
     [
@@ -44,6 +47,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
       input.end_date ?? null,
       input.remind_time ?? null,
       input.note ?? null,
+      input.status ?? "todo",
     ],
   );
   return rows[0] ?? (await getTask(id))!;
@@ -103,7 +107,9 @@ export async function updateTask(id: string, input: UpdateTaskInput): Promise<Ta
     `UPDATE tasks SET ${fields.join(", ")} WHERE id = $${values.length} RETURNING *`,
     values,
   );
-  return rows[0] ?? null;
+  const task = rows[0] ?? null;
+  if (task && input.status !== undefined) await syncLogWithStatus(task);
+  return task;
 }
 
 export async function deleteTask(id: string): Promise<boolean> {
@@ -120,4 +126,33 @@ export async function setTaskDone(taskId: string, date: string, done: boolean): 
      DO UPDATE SET done = $4, done_at = CASE WHEN $4 THEN now() ELSE NULL END`,
     [ulid(), taskId, date, done],
   );
+  // 非循环任务:勾选与 status 双向同步的"勾→态"方向(勾完成 = done,取消 = 回 todo)
+  await getPool().query(
+    `UPDATE tasks SET status = CASE WHEN $2 THEN 'done' ELSE 'todo' END
+     WHERE id = $1 AND recurrence IS NULL
+       AND (($2 AND status != 'done') OR (NOT $2 AND status = 'done'))`,
+    [taskId, done],
+  );
+}
+
+/**
+ * "态→勾"方向:status 改动时同步 task_log(仅非循环任务)。
+ * 改成 done → 记完成;从 done 改走 → 取消完成。updateTask 之后调用。
+ */
+async function syncLogWithStatus(task: Task): Promise<void> {
+  if (task.recurrence) return;
+  const logDate = task.due_date ?? todayLocal();
+  if (task.status === "done") {
+    await getPool().query(
+      `INSERT INTO task_log (id, task_id, date, done, done_at)
+       VALUES ($1, $2, $3, TRUE, now())
+       ON CONFLICT (task_id, date) DO UPDATE SET done = TRUE, done_at = now()`,
+      [ulid(), task.id, logDate],
+    );
+  } else {
+    await getPool().query(
+      "UPDATE task_log SET done = FALSE, done_at = NULL WHERE task_id = $1 AND done",
+      [task.id],
+    );
+  }
 }

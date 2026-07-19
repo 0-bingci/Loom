@@ -9,9 +9,13 @@ export interface Task {
   end_date: string | null;
   remind_time: string | null; // 'HH:MM'
   note: string | null; // 备注(自由文本)
+  /** 六态两族;仅非循环任务有意义。推进线:todo/doing/testing/done;停靠区:waiting/incubating */
+  status: TaskStatus;
   archived: boolean;
   created_at: string; // ISO8601
 }
+
+export type TaskStatus = "todo" | "doing" | "testing" | "done" | "waiting" | "incubating";
 
 export interface TaskLog {
   id: string;

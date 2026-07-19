@@ -2,6 +2,7 @@ import { IconCheck, IconClock, IconRepeat } from "@tabler/icons-react";
 import { toggleDone, selectTask } from "../app/dashboardSlice";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { fmtDate, fmtRecurrence, overdueDays } from "../lib/format";
+import { statusMeta } from "../lib/status";
 import type { DashboardItem } from "../types";
 
 export default function TaskRow({ item, index }: { item: DashboardItem; index: number }) {
@@ -65,6 +66,11 @@ export default function TaskRow({ item, index }: { item: DashboardItem; index: n
         {meta}
       </div>
 
+      {item.kind === "once" && t.status !== "todo" && t.status !== "done" && (
+        <span className={`whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] ${statusMeta(t.status).cls}`}>
+          {statusMeta(t.status).label}
+        </span>
+      )}
       {item.kind === "recurring" ? (
         <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-rec-soft px-2 py-0.5 text-[11px] text-rec">
           <IconRepeat size={11} />

@@ -5,6 +5,7 @@ import {
   IconCheck,
   IconList,
   IconPencil,
+  IconProgress,
   IconRepeat,
   IconSquare,
   IconSquareCheck,
@@ -12,9 +13,11 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { selectTask, toggleDone } from "../app/dashboardSlice";
+import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
+import { STATUSES, type TaskStatus } from "../lib/status";
 import type { DashboardItem, Task } from "../types";
 import TaskEditor from "./TaskEditor";
 
@@ -29,6 +32,40 @@ function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; childre
 }
 
 const pill = "inline-flex items-center gap-1.5 rounded-lg px-[11px] py-1 text-[13px]";
+
+/** 状态选择:六态两族,点击即存(仅非循环任务) */
+function StatusPicker({ task }: { task: Task }) {
+  const dispatch = useAppDispatch();
+  const setStatus = async (s: TaskStatus) => {
+    if (s === task.status) return;
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${task.id}`, body: { status: s } });
+    void dispatch(syncNow());
+  };
+  return (
+    <div className="flex items-start gap-3 border-t border-line py-[11px]">
+      <span className="w-5 text-center text-ink3"><IconProgress size={17} /></span>
+      <span className="w-[66px] pt-0.5 text-[13px] text-ink2">状态</span>
+      <div className="flex flex-1 flex-col gap-1.5">
+        {(["推进线", "停靠区"] as const).map((family) => (
+          <div key={family} className="flex flex-wrap items-center gap-1">
+            <span className="mr-0.5 text-[11px] text-ink3">{family}</span>
+            {STATUSES.filter((s) => s.family === family).map((s) => (
+              <button
+                key={s.value}
+                onClick={() => void setStatus(s.value)}
+                className={`rounded-md px-2 py-0.5 text-[11.5px] transition-all ${s.cls} ${
+                  task.status === s.value ? "ring-1 ring-current" : "opacity-55 hover:opacity-100"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** 任务备注:失焦自动保存(离线走发件箱) */
 function NoteBox({ task }: { task: Task }) {
@@ -141,6 +178,8 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
             )}
           </Prop>
         )}
+
+        {item.kind === "once" && <StatusPicker task={t} />}
 
         <Prop icon={<IconBell size={17} />} k="提醒">
           {t.remind_time ? (
