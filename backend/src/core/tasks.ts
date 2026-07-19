@@ -27,6 +27,7 @@ export interface UpdateTaskInput {
   remind_time?: string | null;
   note?: string | null;
   status?: TaskStatus;
+  sort_order?: number | null;
   archived?: boolean;
 }
 

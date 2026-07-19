@@ -59,7 +59,13 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
     });
   }
 
-  // 逾期的排最前,然后按提醒时间。
-  items.sort((a, b) => Number(b.overdue) - Number(a.overdue));
+  // 逾期最前;组内按手动排序(未排的靠后,按创建时间)。
+  const ord = (x: DashboardItem) => x.task.sort_order ?? Infinity;
+  items.sort(
+    (a, b) =>
+      Number(b.overdue) - Number(a.overdue) ||
+      ord(a) - ord(b) ||
+      (a.task.created_at < b.task.created_at ? -1 : 1),
+  );
   return items;
 }

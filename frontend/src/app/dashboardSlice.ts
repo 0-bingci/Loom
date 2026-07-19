@@ -81,6 +81,20 @@ const dashboardSlice = createSlice({
     selectTask(state, action: PayloadAction<string | null>) {
       state.selectedId = action.payload;
     },
+    /** 拖拽排序:就地更新 sort_order 并重排(与后端同一套比较规则) */
+    applySortOrders(state, action: PayloadAction<{ id: string; sort_order: number }[]>) {
+      for (const p of action.payload) {
+        const it = state.items.find((i) => i.task.id === p.id);
+        if (it) it.task.sort_order = p.sort_order;
+      }
+      const ord = (x: DashboardItem) => x.task.sort_order ?? Infinity;
+      state.items.sort(
+        (a, b) =>
+          Number(b.overdue) - Number(a.overdue) ||
+          ord(a) - ord(b) ||
+          (a.task.created_at < b.task.created_at ? -1 : 1),
+      );
+    },
     /** 离线启动时用快照垫底 */
     hydrate(state, action: PayloadAction<{ date: string; items: DashboardItem[] }>) {
       if (state.loaded) return;
@@ -133,6 +147,7 @@ const dashboardSlice = createSlice({
             end_date: "end_date" in b ? (b.end_date ?? null) : null,
             remind_time: b.remind_time,
             note: null,
+            sort_order: null,
             status: "todo",
             archived: false,
             created_at: new Date().toISOString(),
@@ -148,5 +163,5 @@ const dashboardSlice = createSlice({
   },
 });
 
-export const { selectTask, hydrate } = dashboardSlice.actions;
+export const { selectTask, hydrate, applySortOrders } = dashboardSlice.actions;
 export default dashboardSlice.reducer;

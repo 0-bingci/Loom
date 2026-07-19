@@ -1,9 +1,11 @@
 import { IconFilter } from "@tabler/icons-react";
 import { useState } from "react";
+import { applySortOrders } from "../app/dashboardSlice";
 import AddBar from "../components/AddBar";
 import DetailPanel from "../components/DetailPanel";
 import TaskRow from "../components/TaskRow";
-import { useAppSelector } from "../app/store";
+import { useAppDispatch, useAppSelector } from "../app/store";
+import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, weekday } from "../lib/format";
 import type { DashboardItem } from "../types";
 
@@ -44,9 +46,77 @@ function matches(it: DashboardItem, f: TodayFilter): boolean {
 }
 
 export default function TodayPage() {
+  const dispatch = useAppDispatch();
   const { date, items, loaded } = useAppSelector((s) => s.dashboard);
   const [filter, setFilter] = useState<TodayFilter>(loadFilter);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null); // 当前悬停的目标行(插到它前面)
+
+  /**
+   * 放下:插到 targetId 前面(targetId 为 null = 段尾)。
+   * 序号取邻居中点;邻居还没编过号就给整段重新编号(首次拖拽时发生一次)。
+   */
+  const dropIn = (section: DashboardItem[], targetId: string | null) => {
+    setOverId(null);
+    const fromId = dragId;
+    setDragId(null);
+    if (!fromId || fromId === targetId) return;
+    const moved = section.find((i) => i.task.id === fromId);
+    if (!moved) return; // 不允许跨段(逾期/今天)拖
+    const rest = section.filter((i) => i.task.id !== fromId);
+    const at = targetId === null ? rest.length : rest.findIndex((i) => i.task.id === targetId);
+    if (at < 0) return;
+    const arr = [...rest.slice(0, at), moved, ...rest.slice(at)];
+
+    const prev = arr[at - 1];
+    const next = arr[at + 1];
+    let patches: { id: string; sort_order: number }[];
+    if ((prev && prev.task.sort_order == null) || (next && next.task.sort_order == null)) {
+      patches = arr.map((it, i) => ({ id: it.task.id, sort_order: i }));
+    } else if (prev && next) {
+      patches = [{ id: fromId, sort_order: (prev.task.sort_order! + next.task.sort_order!) / 2 }];
+    } else if (prev) {
+      patches = [{ id: fromId, sort_order: prev.task.sort_order! + 1 }];
+    } else if (next) {
+      patches = [{ id: fromId, sort_order: next.task.sort_order! - 1 }];
+    } else {
+      return; // 只有一条,没得排
+    }
+
+    dispatch(applySortOrders(patches)); // 界面立刻重排
+    for (const p of patches) {
+      void sendOrQueue({ method: "PATCH", path: `/tasks/${p.id}`, body: { sort_order: p.sort_order } });
+    }
+  };
+
+  const draggableRow = (it: DashboardItem, section: DashboardItem[], index: number) => (
+    <div
+      key={it.task.id}
+      draggable
+      title="可拖拽调整顺序"
+      onDragStart={() => setDragId(it.task.id)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (dragId && dragId !== it.task.id) setOverId(it.task.id);
+      }}
+      onDragLeave={() => overId === it.task.id && setOverId(null)}
+      onDrop={() => dropIn(section, it.task.id)}
+      onDragEnd={() => { setDragId(null); setOverId(null); }}
+      className={overId === it.task.id ? "border-t-2 border-accent" : "border-t-2 border-transparent"}
+    >
+      <TaskRow item={it} index={index} />
+    </div>
+  );
+
+  /** 段尾落点:拖到列表最后 */
+  const tailZone = (section: DashboardItem[]) => (
+    <div
+      className={`h-3 ${overId === `tail` && dragId ? "border-t-2 border-accent" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); setOverId("tail"); }}
+      onDrop={() => dropIn(section, null)}
+    />
+  );
 
   const setF = (key: keyof TodayFilter, v: boolean) => {
     const next = { ...filter, [key]: v };
@@ -131,9 +201,8 @@ export default function TodayPage() {
               <small className="text-ink3">未做完,一直挂着</small>
             </div>
             <div className="px-2 md:px-5">
-              {over.map((it, i) => (
-                <TaskRow key={it.task.id} item={it} index={i} />
-              ))}
+              {over.map((it, i) => draggableRow(it, over, i))}
+              {tailZone(over)}
             </div>
           </>
         )}
@@ -149,7 +218,10 @@ export default function TodayPage() {
               {hidden > 0 ? "都被筛掉了——点右上角调整筛选" : "今天没有任务 🎉"}
             </div>
           ) : (
-            today.map((it, i) => <TaskRow key={it.task.id} item={it} index={over.length + i} />)
+            <>
+              {today.map((it, i) => draggableRow(it, today, over.length + i))}
+              {tailZone(today)}
+            </>
           )}
         </div>
       </main>

@@ -9,6 +9,7 @@ export interface Task {
   end_date: string | null;
   remind_time: string | null; // 'HH:MM'
   note: string | null; // 备注(自由文本)
+  sort_order: number | null; // 手动排序序号,NULL=未排
   /** 六态两族;仅非循环任务有意义。推进线:todo/doing/testing/done;停靠区:waiting/incubating */
   status: TaskStatus;
   archived: boolean;

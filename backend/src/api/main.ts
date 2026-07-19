@@ -69,7 +69,9 @@ const createTaskSchema = z
   .object({ id: ulidStr.optional(), ...taskFields })
   .refine((v) => !(v.due_date && v.recurrence), "due_date 与 recurrence 只能二选一");
 
-const updateTaskSchema = z.object({ ...taskFields, archived: z.boolean() }).partial();
+const updateTaskSchema = z
+  .object({ ...taskFields, sort_order: z.number().finite().nullable(), archived: z.boolean() })
+  .partial();
 
 function parseBody<T>(schema: z.ZodType<T>, body: unknown): { ok: true; data: T } | { ok: false; error: string } {
   const r = schema.safeParse(body);
