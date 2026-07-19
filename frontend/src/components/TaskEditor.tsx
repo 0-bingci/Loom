@@ -14,6 +14,12 @@ type Kind = "inbox" | "once" | "daily" | "weekly";
 const kindOf = (t: Task): Kind =>
   t.recurrence ? (t.recurrence === "daily" ? "daily" : "weekly") : t.due_date ? "once" : "inbox";
 
+const addDays = (d: string, n: number) => {
+  const t = new Date(`${d}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + n);
+  return t.toISOString().slice(0, 10);
+};
+
 const input = "rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink2";
 
 /** 任务定义编辑器:类型/日期/循环规则/生效区间/提醒 全可改。改的是定义,所有按日视图立即跟随。 */
@@ -21,15 +27,18 @@ export default function TaskEditor({
   task,
   onSaved,
   onCancel,
+  initialKind,
 }: {
   task: Task;
   onSaved: () => void;
   onCancel: () => void;
+  /** 覆盖初始类型(收集箱"安排"时默认进"某天"模式) */
+  initialKind?: Kind;
 }) {
   const dispatch = useAppDispatch();
   const today = useAppSelector((s) => s.dashboard.date);
   const [title, setTitle] = useState(task.title);
-  const [kind, setKind] = useState<Kind>(kindOf(task));
+  const [kind, setKind] = useState<Kind>(initialKind ?? kindOf(task));
   const [due, setDue] = useState(task.due_date ?? today);
   const [days, setDays] = useState<string[]>(
     task.recurrence?.startsWith("weekly:") ? task.recurrence.slice("weekly:".length).split(",") : [],
@@ -95,6 +104,7 @@ export default function TaskEditor({
           <span className="w-[38px] text-xs text-ink3">日期</span>
           <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={input} />
           <button onClick={() => setDue(today)} className="rounded-md border border-line px-2 py-0.5 text-xs text-ink2 hover:border-accent hover:text-accent">今天</button>
+          <button onClick={() => setDue(addDays(today, 1))} className="rounded-md border border-line px-2 py-0.5 text-xs text-ink2 hover:border-accent hover:text-accent">明天</button>
         </div>
       )}
 

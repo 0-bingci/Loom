@@ -4,14 +4,12 @@ import {
   IconCheckbox,
   IconInbox,
   IconNote,
-  IconPencil,
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 import { toggleDone } from "../app/dashboardSlice";
-import { syncNow } from "../app/sync";
-import { useAppDispatch, useAppSelector } from "../app/store";
+import { useAppDispatch } from "../app/store";
 import { api, ulid } from "../lib/api";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate } from "../lib/format";
@@ -36,13 +34,11 @@ type Entry =
 /** 收集箱:随手记的碎片 + 还没安排的待办,一条时间流。 */
 export default function InboxPage() {
   const dispatch = useAppDispatch();
-  const today = useAppSelector((s) => s.dashboard.date);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"note" | "task">("note"); // 随手记的更多,碎片是默认
   const [error, setError] = useState(false);
-  const [schedulingId, setSchedulingId] = useState<string | null>(null); // 正在挑日期的待办
-  const [editingId, setEditingId] = useState<string | null>(null); // 正在编辑的待办
+  const [arrangingId, setArrangingId] = useState<string | null>(null); // 正在安排的待办
 
   const load = useCallback(async () => {
     try {
@@ -93,20 +89,6 @@ export default function InboxPage() {
     void dispatch(toggleDone({ id: e.id, done: true }));
     setEntries((prev) => prev.filter((x) => x.id !== e.id));
   };
-
-  const scheduleTo = async (e: Entry, date: string) => {
-    setSchedulingId(null);
-    setEntries((prev) => prev.filter((x) => x.id !== e.id));
-    await sendOrQueue({ method: "PATCH", path: `/tasks/${e.id}`, body: { due_date: date } });
-    void dispatch(syncNow());
-  };
-
-  const tomorrow = (() => {
-    if (!today) return "";
-    const d = new Date(`${today}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + 1);
-    return d.toISOString().slice(0, 10);
-  })();
 
   /** 碎片转待办:建同内容的收集箱任务,删掉原碎片 */
   const noteToTask = async (e: Entry) => {
@@ -195,12 +177,11 @@ export default function InboxPage() {
 
               <div className="flex shrink-0 items-center gap-1.5">
                 {e.kind === "task" ? (
-                  <>
                   <button
-                    onClick={() => { setSchedulingId(schedulingId === e.id ? null : e.id); setEditingId(null); }}
-                    title="安排日期"
+                    onClick={() => setArrangingId(arrangingId === e.id ? null : e.id)}
+                    title="安排(日期 / 循环 / 提醒)"
                     className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[12px] ${
-                      schedulingId === e.id
+                      arrangingId === e.id
                         ? "border-accent text-accent"
                         : "border-line text-ink2 hover:border-accent hover:text-accent"
                     }`}
@@ -208,15 +189,6 @@ export default function InboxPage() {
                     <IconCalendarPlus size={13} />
                     <span className="hidden md:inline">安排</span>
                   </button>
-                  <button
-                    aria-label="编辑"
-                    title="编辑(可设为循环任务)"
-                    onClick={() => { setEditingId(editingId === e.id ? null : e.id); setSchedulingId(null); }}
-                    className={editingId === e.id ? "text-accent" : "text-ink3 hover:text-ink"}
-                  >
-                    <IconPencil size={15} />
-                  </button>
-                  </>
                 ) : (
                   <button
                     onClick={() => void noteToTask(e)}
@@ -233,41 +205,17 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {editingId === e.id && e.kind === "task" && (
+            {arrangingId === e.id && e.kind === "task" && (
               <div className="mt-2 rounded-[10px] border border-line bg-bg p-3 md:ml-8">
                 <TaskEditor
                   task={e.task}
+                  initialKind="once"
                   onSaved={() => {
-                    setEditingId(null);
-                    void load(); // 设了日期/循环的会离开收集箱
+                    setArrangingId(null);
+                    void load(); // 安排好的会离开收集箱
                   }}
-                  onCancel={() => setEditingId(null)}
+                  onCancel={() => setArrangingId(null)}
                 />
-              </div>
-            )}
-
-            {schedulingId === e.id && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8 text-xs">
-                <span className="text-ink3">安排到</span>
-                <button
-                  onClick={() => void scheduleTo(e, today)}
-                  className="rounded-md border border-line px-2.5 py-1 text-ink2 hover:border-accent hover:text-accent"
-                >
-                  今天
-                </button>
-                <button
-                  onClick={() => void scheduleTo(e, tomorrow)}
-                  className="rounded-md border border-line px-2.5 py-1 text-ink2 hover:border-accent hover:text-accent"
-                >
-                  明天
-                </button>
-                <input
-                  type="date"
-                  min={today}
-                  onChange={(ev) => ev.target.value && void scheduleTo(e, ev.target.value)}
-                  className="rounded-md border border-line px-1.5 py-0.5 text-xs text-ink2"
-                />
-                <span className="text-ink3">选个日期,它会出现在那天的视图里</span>
               </div>
             )}
             </div>
