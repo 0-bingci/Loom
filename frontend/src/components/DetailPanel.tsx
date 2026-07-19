@@ -45,23 +45,18 @@ function StatusPicker({ task }: { task: Task }) {
     <div className="flex items-start gap-3 border-t border-line py-[11px]">
       <span className="w-5 text-center text-ink3"><IconProgress size={17} /></span>
       <span className="w-[66px] pt-0.5 text-[13px] text-ink2">状态</span>
-      <div className="flex flex-1 flex-col gap-1.5">
-        {/* "完成"不在这里——勾选框专管完成,这里只管中间态与停靠 */}
-        {(["推进线", "停靠区"] as const).map((family) => (
-          <div key={family} className="flex flex-wrap items-center gap-1">
-            <span className="mr-0.5 text-[11px] text-ink3">{family}</span>
-            {STATUSES.filter((s) => s.family === family && s.value !== "done").map((s) => (
-              <button
-                key={s.value}
-                onClick={() => void setStatus(s.value)}
-                className={`rounded-md px-2 py-0.5 text-[11.5px] transition-all ${s.cls} ${
-                  task.status === s.value ? "ring-1 ring-current" : "opacity-55 hover:opacity-100"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-1 flex-wrap items-center gap-1">
+        {/* "完成"不在这里——勾选框专管完成 */}
+        {STATUSES.filter((s) => s.value !== "done").map((s) => (
+          <button
+            key={s.value}
+            onClick={() => void setStatus(s.value)}
+            className={`rounded-md px-2 py-0.5 text-[11.5px] transition-all ${s.cls} ${
+              task.status === s.value ? "ring-1 ring-current" : "opacity-55 hover:opacity-100"
+            }`}
+          >
+            {s.label}
+          </button>
         ))}
       </div>
     </div>

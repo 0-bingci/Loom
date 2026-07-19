@@ -191,16 +191,9 @@ export default function AllTasksPage() {
                           onChange={(e) => void setStatus(t, e.target.value as TaskStatus)}
                           className={`cursor-pointer rounded-md border-0 px-1.5 py-0.5 text-[11px] outline-none ${statusMeta(t.status).cls}`}
                         >
-                          <optgroup label="推进线">
-                            {STATUSES.filter((s) => s.family === "推进线").map((s) => (
-                              <option key={s.value} value={s.value}>{s.label}</option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="停靠区">
-                            {STATUSES.filter((s) => s.family === "停靠区").map((s) => (
-                              <option key={s.value} value={s.value}>{s.label}</option>
-                            ))}
-                          </optgroup>
+                          {STATUSES.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
                         </select>
                         {overdueBadge && <span className={`${pill} bg-over-soft text-over`}>逾期</span>}
                       </span>
