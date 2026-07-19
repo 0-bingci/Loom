@@ -1,4 +1,4 @@
-import { IconCheck, IconClock, IconRepeat } from "@tabler/icons-react";
+import { IconCheck, IconClock, IconGripVertical, IconRepeat } from "@tabler/icons-react";
 import { toggleDone, selectTask } from "../app/dashboardSlice";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { fmtDate, fmtRecurrence, overdueDays } from "../lib/format";
@@ -29,7 +29,7 @@ export default function TaskRow({ item, index }: { item: DashboardItem; index: n
 
   return (
     <div
-      className={`row-in flex cursor-pointer items-center gap-3 rounded-[10px] border px-3.5 py-[11px] transition-colors ${
+      className={`row-in group relative flex cursor-pointer items-center gap-3 rounded-[10px] border px-3.5 py-[11px] transition-colors ${
         selected ? "border-line2 bg-surface" : "border-transparent"
       } ${
         item.overdue
@@ -41,6 +41,10 @@ export default function TaskRow({ item, index }: { item: DashboardItem; index: n
       style={{ animationDelay: `${Math.min(index * 30, 240)}ms` }}
       onClick={() => dispatch(selectTask(t.id))}
     >
+      {/* 拖拽把手:悬停浮现,不占布局 */}
+      <span className="absolute -left-0.5 hidden cursor-grab text-ink3 opacity-0 transition-opacity group-hover:opacity-100 md:block">
+        <IconGripVertical size={15} />
+      </span>
       <button
         aria-label={item.done ? "取消完成" : "完成"}
         onClick={(e) => {
