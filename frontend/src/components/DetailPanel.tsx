@@ -16,7 +16,7 @@ import { selectTask, toggleDone } from "../app/dashboardSlice";
 import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { sendOrQueue } from "../lib/outbox";
-import { fmtDate, fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
+import { fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
 import { STATUSES, type TaskStatus } from "../lib/status";
 import type { DashboardItem, Task } from "../types";
 import TaskEditor from "./TaskEditor";
@@ -32,6 +32,46 @@ function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; childre
 }
 
 const pill = "inline-flex items-center gap-1.5 rounded-lg px-[11px] py-1 text-[13px]";
+
+/** 底部祝福语:按星期轮换 */
+const BLESSINGS = [
+  "留点时间给自己 🌙",
+  "今天也要开心呀 ✨",
+  "慢慢来,比较快 🌱",
+  "把一天织成喜欢的样子 🧶",
+  "任务会做完的,先照顾好自己 ☕",
+  "小步前进也是前进 🐾",
+  "天天开心,万事顺意 🌞",
+];
+
+/** 标题:点进去直接改,失焦保存 */
+function TitleBox({ task, done }: { task: Task; done: boolean }) {
+  const dispatch = useAppDispatch();
+  const [v, setV] = useState(task.title);
+  useEffect(() => setV(task.title), [task.id, task.title]);
+
+  const save = async () => {
+    const trimmed = v.trim();
+    if (!trimmed || trimmed === task.title) {
+      setV(task.title);
+      return;
+    }
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${task.id}`, body: { title: trimmed } });
+    void dispatch(syncNow());
+  };
+
+  return (
+    <input
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => void save()}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      className={`w-full border-0 bg-transparent text-[19px] font-medium leading-[1.35] outline-none ${
+        done ? "text-ink3 line-through" : ""
+      }`}
+    />
+  );
+}
 
 /** 状态选择:六态两族,点击即存(仅非循环任务) */
 function StatusPicker({ task }: { task: Task }) {
@@ -144,9 +184,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           >
             {item.done && <IconCheck size={13} />}
           </button>
-          <div className={`text-[19px] font-medium leading-[1.35] ${item.done ? "text-ink3 line-through" : ""}`}>
-            {t.title}
-          </div>
+          <TitleBox task={t} done={item.done} />
         </div>
 
         {item.kind === "recurring" ? (
@@ -165,24 +203,58 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           </>
         ) : (
           <Prop icon={<IconCalendar size={17} />} k="日期">
-            {item.overdue ? (
-              <span className={`${pill} bg-over-soft text-over`}>
-                {fmtDate(t.due_date!)} · 逾期 {overdueDays(t.due_date!, today)} 天
-              </span>
-            ) : (
-              <span className={`${pill} bg-[#EFEDE6] text-ink2`}>{fmtDate(t.due_date!)}</span>
-            )}
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={t.due_date!}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  void sendOrQueue({ method: "PATCH", path: `/tasks/${t.id}`, body: { due_date: e.target.value } }).then(
+                    () => void dispatch(syncNow()),
+                  );
+                }}
+                className={`cursor-pointer rounded-lg border-0 px-2.5 py-1 text-[13px] outline-none ${
+                  item.overdue ? "bg-over-soft text-over" : "bg-[#EFEDE6] text-ink2"
+                }`}
+              />
+              {item.overdue && (
+                <span className="text-xs text-over">逾期 {overdueDays(t.due_date!, today)} 天</span>
+              )}
+            </span>
           </Prop>
         )}
 
         {item.kind === "once" && !item.done && <StatusPicker task={t} />}
 
         <Prop icon={<IconBell size={17} />} k="提醒">
-          {t.remind_time ? (
-            <span className={`${pill} bg-accent-soft text-accent`}>{t.remind_time}</span>
-          ) : (
-            <span className="text-ink3">未设置</span>
-          )}
+          <span className="inline-flex items-center gap-2">
+            <input
+              type="time"
+              value={t.remind_time ?? ""}
+              onChange={(e) =>
+                void sendOrQueue({
+                  method: "PATCH",
+                  path: `/tasks/${t.id}`,
+                  body: { remind_time: e.target.value || null },
+                }).then(() => void dispatch(syncNow()))
+              }
+              className={`cursor-pointer rounded-lg border-0 px-2.5 py-1 text-[13px] outline-none ${
+                t.remind_time ? "bg-accent-soft text-accent" : "bg-[#EFEDE6] text-ink3"
+              }`}
+            />
+            {t.remind_time && (
+              <button
+                onClick={() =>
+                  void sendOrQueue({ method: "PATCH", path: `/tasks/${t.id}`, body: { remind_time: null } }).then(
+                    () => void dispatch(syncNow()),
+                  )
+                }
+                className="text-xs text-ink3 hover:text-ink"
+              >
+                清除
+              </button>
+            )}
+          </span>
         </Prop>
         <Prop icon={<IconList size={17} />} k="清单">
           <span className="text-ink2">默认(清单规划中)</span>
@@ -193,7 +265,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
       )}
 
       <div className="flex items-center gap-2 border-t border-line px-5 py-3 text-xs text-ink3">
-        <IconBell size={14} /> 到点会写入提醒,客户端从这里拉取
+        {BLESSINGS[new Date().getDay()]}
       </div>
     </>
   );
