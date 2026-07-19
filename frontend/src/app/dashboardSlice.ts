@@ -110,6 +110,8 @@ const dashboardSlice = createSlice({
         const it = state.items.find((i) => i.task.id === meta.arg.id);
         if (it && (meta.arg.date === undefined || meta.arg.date === it.date)) {
           it.done = meta.arg.done;
+          // 非循环任务:status 与勾选同步(服务端同样如此,这里让界面立刻一致)
+          if (it.kind === "once") it.task.status = meta.arg.done ? "done" : "todo";
         }
       })
       .addCase(toggleDone.fulfilled, (state, { payload }) => {

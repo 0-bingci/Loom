@@ -46,10 +46,11 @@ function StatusPicker({ task }: { task: Task }) {
       <span className="w-5 text-center text-ink3"><IconProgress size={17} /></span>
       <span className="w-[66px] pt-0.5 text-[13px] text-ink2">状态</span>
       <div className="flex flex-1 flex-col gap-1.5">
+        {/* "完成"不在这里——勾选框专管完成,这里只管中间态与停靠 */}
         {(["推进线", "停靠区"] as const).map((family) => (
           <div key={family} className="flex flex-wrap items-center gap-1">
             <span className="mr-0.5 text-[11px] text-ink3">{family}</span>
-            {STATUSES.filter((s) => s.family === family).map((s) => (
+            {STATUSES.filter((s) => s.family === family && s.value !== "done").map((s) => (
               <button
                 key={s.value}
                 onClick={() => void setStatus(s.value)}
@@ -179,7 +180,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           </Prop>
         )}
 
-        {item.kind === "once" && <StatusPicker task={t} />}
+        {item.kind === "once" && !item.done && <StatusPicker task={t} />}
 
         <Prop icon={<IconBell size={17} />} k="提醒">
           {t.remind_time ? (
