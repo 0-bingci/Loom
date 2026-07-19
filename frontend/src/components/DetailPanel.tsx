@@ -2,7 +2,6 @@ import {
   IconBell,
   IconCalendar,
   IconCalendarStats,
-  IconCheck,
   IconList,
   IconPencil,
   IconProgress,
@@ -12,7 +11,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { selectTask, toggleDone } from "../app/dashboardSlice";
+import { selectTask } from "../app/dashboardSlice";
 import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { sendOrQueue } from "../lib/outbox";
@@ -86,8 +85,7 @@ function StatusPicker({ task }: { task: Task }) {
       <span className="w-5 text-center text-ink3"><IconProgress size={17} /></span>
       <span className="w-[66px] pt-0.5 text-[13px] text-ink2">状态</span>
       <div className="flex flex-1 flex-wrap items-center gap-1">
-        {/* "完成"不在这里——勾选框专管完成 */}
-        {STATUSES.filter((s) => s.value !== "done").map((s) => (
+        {STATUSES.map((s) => (
           <button
             key={s.value}
             onClick={() => void setStatus(s.value)}
@@ -174,16 +172,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
       ) : (
       <div className="flex-1 p-5">
         <div className="mb-3 text-xs text-ink3">今天 ›</div>
-        <div className="mb-5 flex items-start gap-3">
-          <button
-            aria-label={item.done ? "取消完成" : "完成"}
-            onClick={() => void dispatch(toggleDone({ id: t.id, done: !item.done }))}
-            className={`mt-0.5 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-md border-[1.6px] text-white ${
-              item.done ? "border-accent bg-accent" : "border-line2 hover:border-accent"
-            }`}
-          >
-            {item.done && <IconCheck size={13} />}
-          </button>
+        <div className="mb-5">
           <TitleBox task={t} done={item.done} />
         </div>
 
@@ -224,7 +213,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           </Prop>
         )}
 
-        {item.kind === "once" && !item.done && <StatusPicker task={t} />}
+        {item.kind === "once" && <StatusPicker task={t} />}
 
         <Prop icon={<IconBell size={17} />} k="提醒">
           <span className="inline-flex items-center gap-2">
