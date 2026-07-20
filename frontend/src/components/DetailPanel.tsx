@@ -191,26 +191,61 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
             )}
           </>
         ) : (
-          <Prop icon={<IconCalendar size={17} />} k="日期">
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <input
-                type="date"
-                value={t.due_date!}
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  void sendOrQueue({ method: "PATCH", path: `/tasks/${t.id}`, body: { due_date: e.target.value } }).then(
-                    () => void dispatch(syncNow()),
-                  );
-                }}
-                className={`cursor-pointer rounded-lg border-0 px-2.5 py-1 text-[13px] outline-none ${
-                  item.overdue ? "bg-over-soft text-over" : "bg-[#EFEDE6] text-ink2"
-                }`}
-              />
-              {item.overdue && (
-                <span className="text-xs text-over">逾期 {overdueDays(t.due_date!, today)} 天</span>
-              )}
-            </span>
-          </Prop>
+          <>
+            <Prop icon={<IconCalendar size={17} />} k="死线">
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={t.due_date ?? ""}
+                  onChange={(e) =>
+                    void sendOrQueue({
+                      method: "PATCH",
+                      path: `/tasks/${t.id}`,
+                      body: { due_date: e.target.value || null },
+                    }).then(() => void dispatch(syncNow()))
+                  }
+                  className={`cursor-pointer rounded-lg border-0 px-2.5 py-1 text-[13px] outline-none ${
+                    item.overdue ? "bg-over-soft text-over" : t.due_date ? "bg-[#EFEDE6] text-ink2" : "bg-[#EFEDE6] text-ink3"
+                  }`}
+                />
+                {item.overdue && (
+                  <span className="text-xs text-over">逾期 {overdueDays(t.due_date!, today)} 天</span>
+                )}
+              </span>
+            </Prop>
+            <Prop icon={<IconCalendarStats size={17} />} k="计划做">
+              <span className="inline-flex items-center gap-2">
+                <input
+                  type="date"
+                  value={t.plan_date ?? ""}
+                  onChange={(e) =>
+                    void sendOrQueue({
+                      method: "PATCH",
+                      path: `/tasks/${t.id}`,
+                      body: { plan_date: e.target.value || null },
+                    }).then(() => void dispatch(syncNow()))
+                  }
+                  className={`cursor-pointer rounded-lg border-0 px-2.5 py-1 text-[13px] outline-none ${
+                    t.plan_date ? "bg-accent-soft text-accent" : "bg-[#EFEDE6] text-ink3"
+                  }`}
+                />
+                {t.plan_date ? (
+                  <button
+                    onClick={() =>
+                      void sendOrQueue({ method: "PATCH", path: `/tasks/${t.id}`, body: { plan_date: null } }).then(
+                        () => void dispatch(syncNow()),
+                      )
+                    }
+                    className="text-xs text-ink3 hover:text-ink"
+                  >
+                    放回待安排
+                  </button>
+                ) : (
+                  <span className="text-xs text-ink3">还没排</span>
+                )}
+              </span>
+            </Prop>
+          </>
         )}
 
         {item.kind === "once" && <StatusPicker task={t} />}

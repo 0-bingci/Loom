@@ -1,13 +1,15 @@
-import { IconBellRinging, IconFilter } from "@tabler/icons-react";
+import { IconBellRinging, IconCalendarPlus, IconFilter, IconTarget } from "@tabler/icons-react";
 import { useState } from "react";
-import { applySortOrders, toggleDone } from "../app/dashboardSlice";
+import { applySortOrders, selectTask, setPlanDate, toggleDone } from "../app/dashboardSlice";
 import { markRead } from "../app/notificationsSlice";
+import { syncNow } from "../app/sync";
 import AddBar from "../components/AddBar";
 import DetailPanel from "../components/DetailPanel";
 import TaskRow from "../components/TaskRow";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, weekday } from "../lib/format";
+import { useSettings } from "../lib/settings";
 import type { DashboardItem } from "../types";
 
 /** 到点的提醒:顶在今天页最上面,直到你处理它 */
@@ -86,6 +88,52 @@ function matches(it: DashboardItem, f: TodayFilter): boolean {
     return false;
   }
   return true;
+}
+
+/** 距死线的中文提示 */
+function daysLeftLabel(d: number | null): string {
+  if (d == null) return "";
+  return d <= 1 ? "明天到期" : `还剩 ${d} 天`;
+}
+
+/** 临近死线区的一行:只有死线、还没排期。可「今天做」或排到任意一天。 */
+function UpcomingRow({ item, today }: { item: DashboardItem; today: string }) {
+  const dispatch = useAppDispatch();
+  const t = item.task;
+  const near = (item.days_left ?? 99) <= 3;
+
+  const plan = (date: string | null) =>
+    void dispatch(setPlanDate({ id: t.id, plan_date: date })).then(() => void dispatch(syncNow()));
+
+  return (
+    <div className="row-in group flex items-center gap-3 rounded-[10px] border border-transparent px-3.5 py-[10px] hover:bg-surface">
+      <span className="w-[18px] shrink-0 text-center text-ink3"><IconTarget size={16} /></span>
+      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => dispatch(selectTask(t.id))}>
+        <div className="truncate text-[14px] leading-[1.35] text-ink2">{t.title}</div>
+        <div className={`mt-0.5 text-xs ${near ? "text-over" : "text-ink3"}`}>
+          {fmtDate(t.due_date!)} 截止 · {daysLeftLabel(item.days_left)}
+        </div>
+      </div>
+      <button
+        onClick={() => plan(today)}
+        className="shrink-0 rounded-md bg-accent-soft px-2.5 py-1 text-xs text-accent hover:bg-accent/15"
+      >
+        今天做
+      </button>
+      <label
+        title="排到某天做"
+        className="relative flex h-[26px] w-[26px] shrink-0 cursor-pointer items-center justify-center rounded-md text-ink3 hover:bg-bg hover:text-ink2"
+      >
+        <IconCalendarPlus size={16} />
+        <input
+          type="date"
+          min={today}
+          onChange={(e) => e.target.value && plan(e.target.value)}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+    </div>
+  );
 }
 
 export default function TodayPage() {
@@ -167,12 +215,17 @@ export default function TodayPage() {
     localStorage.setItem(FILTER_KEY, JSON.stringify(next));
   };
 
+  const { ddlLeadDays } = useSettings();
   const filtered = items.filter((it) => matches(it, filter));
   const over = filtered.filter((i) => i.overdue);
-  const today = filtered.filter((i) => !i.overdue);
-  const hidden = items.length - filtered.length;
-  // 进度条永远按全量算,不受筛选影响
-  const done = items.filter((i) => i.done).length;
+  const dueToday = filtered.filter((i) => i.due_today);
+  const today = filtered.filter((i) => !i.overdue && !i.due_today && !i.upcoming);
+  // 临近死线:只显示窗口内(死线前 N 天,N 由浏览器设置决定)的
+  const upcoming = filtered.filter((i) => i.upcoming && (i.days_left ?? Infinity) <= ddlLeadDays);
+  // 计数/进度只算"今天要做的",不含临近死线预告
+  const main = items.filter((i) => !i.upcoming);
+  const done = main.filter((i) => i.done).length;
+  const hidden = main.length - over.length - dueToday.length - today.length;
   const filterActive = Object.values(filter).some((v) => !v);
 
   return (
@@ -229,11 +282,11 @@ export default function TodayPage() {
         <div className="mx-4 mt-3 mb-1 flex h-[5px] overflow-hidden rounded-full bg-[#EDEAE2] md:mx-7">
           <i
             className="block h-full bg-accent transition-[width] duration-300"
-            style={{ width: items.length ? `${Math.round((done / items.length) * 100)}%` : "0%" }}
+            style={{ width: main.length ? `${Math.round((done / main.length) * 100)}%` : "0%" }}
           />
         </div>
         <div className="px-4 pb-2 text-xs text-ink3 md:px-7">
-          完成 {done} / {items.length} · 今天织进 {items.length} 条
+          完成 {done} / {main.length} · 今天织进 {main.length} 条
           {hidden > 0 && <span> · 筛掉 {hidden} 条</span>}
         </div>
 
@@ -252,10 +305,23 @@ export default function TodayPage() {
           </>
         )}
 
+        {loaded && dueToday.length > 0 && (
+          <>
+            <div className="flex items-center gap-[7px] px-4 pt-4 pb-1.5 text-xs tracking-[0.5px] md:px-7">
+              <span className="font-medium text-over">今天截止</span>
+              <small className="text-ink3">死线就是今天</small>
+            </div>
+            <div className="px-2 md:px-5">
+              {dueToday.map((it, i) => draggableRow(it, dueToday, over.length + i))}
+              {tailZone(dueToday)}
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-[7px] px-4 pt-4 pb-1.5 text-xs tracking-[0.5px] md:px-7">
           <span className="font-medium text-ink2">今天</span>
         </div>
-        <div className="px-2 pb-24 md:px-5 md:pb-6">
+        <div className="px-2 md:px-5">
           {!loaded ? (
             <div className="px-3.5 py-3 text-[13px] text-ink3">加载中…</div>
           ) : today.length === 0 ? (
@@ -264,11 +330,26 @@ export default function TodayPage() {
             </div>
           ) : (
             <>
-              {today.map((it, i) => draggableRow(it, today, over.length + i))}
+              {today.map((it, i) => draggableRow(it, today, over.length + dueToday.length + i))}
               {tailZone(today)}
             </>
           )}
         </div>
+
+        {loaded && upcoming.length > 0 && (
+          <>
+            <div className="flex items-center gap-[7px] px-4 pt-5 pb-1.5 text-xs tracking-[0.5px] md:px-7">
+              <span className="font-medium text-ink2">临近死线</span>
+              <small className="text-ink3">还没排期——挑一天做</small>
+            </div>
+            <div className="px-2 pb-24 md:px-5 md:pb-6">
+              {upcoming.map((it) => (
+                <UpcomingRow key={it.task.id} item={it} today={date} />
+              ))}
+            </div>
+          </>
+        )}
+        {!(loaded && upcoming.length > 0) && <div className="pb-24 md:pb-6" />}
       </main>
 
       <DetailPanel />

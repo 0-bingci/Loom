@@ -41,6 +41,19 @@ export const toggleDone = createAsyncThunk(
   },
 );
 
+/** 排期:设/清 plan_date(把任务安排到某天做,或放回待安排)。离线入队,成功后刷新重新分带。 */
+export const setPlanDate = createAsyncThunk(
+  "dashboard/setPlanDate",
+  async ({ id, plan_date }: { id: string; plan_date: string | null }, { dispatch }) => {
+    const r = await sendOrQueue({ method: "PATCH", path: `/tasks/${id}`, body: { plan_date } });
+    if (r === "queued") {
+      dispatch(setOffline(true));
+      dispatch(setQueued(queueLength()));
+    }
+    return { queued: r === "queued" };
+  },
+);
+
 export interface NewTask {
   title: string;
   kind: "once" | "daily" | "weekly";
@@ -87,10 +100,12 @@ const dashboardSlice = createSlice({
         const it = state.items.find((i) => i.task.id === p.id);
         if (it) it.task.sort_order = p.sort_order;
       }
+      const band = (x: DashboardItem) => (x.overdue ? 0 : x.due_today ? 1 : x.upcoming ? 3 : 2);
       const ord = (x: DashboardItem) => x.task.sort_order ?? Infinity;
       state.items.sort(
         (a, b) =>
-          Number(b.overdue) - Number(a.overdue) ||
+          band(a) - band(b) ||
+          (a.upcoming ? (a.days_left ?? 0) - (b.days_left ?? 0) : 0) ||
           ord(a) - ord(b) ||
           (a.task.created_at < b.task.created_at ? -1 : 1),
       );
@@ -142,6 +157,7 @@ const dashboardSlice = createSlice({
             id: b.id,
             title: b.title,
             due_date: "due_date" in b ? (b.due_date ?? null) : null,
+            plan_date: null,
             recurrence: "recurrence" in b ? (b.recurrence ?? null) : null,
             start_date: "start_date" in b ? (b.start_date ?? null) : null,
             end_date: "end_date" in b ? (b.end_date ?? null) : null,
@@ -155,6 +171,9 @@ const dashboardSlice = createSlice({
           date: state.date,
           kind: payload.kind === "once" ? "once" : "recurring",
           overdue: false,
+          due_today: false,
+          upcoming: false,
+          days_left: null,
           done: false,
           done_at: null,
           pendingSync: true,

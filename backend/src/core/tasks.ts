@@ -10,6 +10,7 @@ export interface CreateTaskInput {
   id?: string;
   title: string;
   due_date?: string | null;
+  plan_date?: string | null;
   recurrence?: string | null;
   start_date?: string | null;
   end_date?: string | null;
@@ -21,6 +22,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   title?: string;
   due_date?: string | null;
+  plan_date?: string | null;
   recurrence?: string | null;
   start_date?: string | null;
   end_date?: string | null;
@@ -35,14 +37,15 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const id = input.id ?? ulid();
   // ON CONFLICT DO NOTHING + 回读:同 id 重放时返回已存在的那条(以先到的为准),不报错不重复。
   const { rows } = await getPool().query<Task>(
-    `INSERT INTO tasks (id, title, due_date, recurrence, start_date, end_date, remind_time, note, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO tasks (id, title, due_date, plan_date, recurrence, start_date, end_date, remind_time, note, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO NOTHING
      RETURNING *`,
     [
       id,
       input.title,
       input.due_date ?? null,
+      input.plan_date ?? null,
       input.recurrence ?? null,
       input.start_date ?? null,
       input.end_date ?? null,
@@ -142,7 +145,7 @@ export async function setTaskDone(taskId: string, date: string, done: boolean): 
  */
 async function syncLogWithStatus(task: Task): Promise<void> {
   if (task.recurrence) return;
-  const logDate = task.due_date ?? todayLocal();
+  const logDate = task.due_date ?? task.plan_date ?? todayLocal();
   if (task.status === "done") {
     await getPool().query(
       `INSERT INTO task_log (id, task_id, date, done, done_at)

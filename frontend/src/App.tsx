@@ -11,6 +11,7 @@ import AllTasksPage from "./pages/AllTasksPage";
 import CalendarPage from "./pages/CalendarPage";
 import InboxPage from "./pages/InboxPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import SettingsPage from "./pages/SettingsPage";
 import TodayPage from "./pages/TodayPage";
 import WeekPage from "./pages/WeekPage";
 
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/all" element={<AllTasksPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/timeline" element={<PlaceholderPage title="时间线" />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>

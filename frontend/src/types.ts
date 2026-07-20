@@ -3,7 +3,8 @@
 export interface Task {
   id: string;
   title: string;
-  due_date: string | null;
+  due_date: string | null; // 死线
+  plan_date: string | null; // 计划哪天做;NULL=还没排
   recurrence: string | null;
   start_date: string | null;
   end_date: string | null;
@@ -21,6 +22,9 @@ export interface DashboardItem {
   date: string;
   kind: "once" | "recurring";
   overdue: boolean;
+  due_today: boolean; // 死线就是今天
+  upcoming: boolean; // 临近死线、还没排期
+  days_left: number | null; // 仅 upcoming:距死线还有几天
   done: boolean;
   done_at: string | null;
   /** 仅前端:离线期间的改动,等待补发 */

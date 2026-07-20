@@ -232,6 +232,7 @@ function blankTask(id: string, title: string): Task {
     id,
     title,
     due_date: null,
+    plan_date: null,
     recurrence: null,
     start_date: null,
     end_date: null,

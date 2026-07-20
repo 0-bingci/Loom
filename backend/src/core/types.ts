@@ -3,7 +3,8 @@
 export interface Task {
   id: string;
   title: string;
-  due_date: string | null; // 'YYYY-MM-DD'
+  due_date: string | null; // 'YYYY-MM-DD',死线
+  plan_date: string | null; // 'YYYY-MM-DD',计划哪天做;NULL=还没排
   recurrence: string | null; // 'daily' / 'weekly:MON,WED'
   start_date: string | null;
   end_date: string | null;
@@ -41,7 +42,10 @@ export interface DashboardItem {
   task: Task;
   date: string; // 这条对应哪一天
   kind: "once" | "recurring";
-  overdue: boolean; // 仅一次性任务:due_date < 今天
+  overdue: boolean; // 仅一次性任务:due_date < 当天
+  due_today: boolean; // 仅一次性:due_date == 当天(死线就是今天,浮在顶部)
+  upcoming: boolean; // 临近死线、还没排期的一次性任务(浮在日视图下方)
+  days_left: number | null; // 仅 upcoming:距死线还有几天
   done: boolean;
   done_at: string | null;
 }

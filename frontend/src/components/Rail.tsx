@@ -5,6 +5,7 @@ import {
   IconNeedleThread,
   IconRefresh,
   IconSearch,
+  IconSettings,
   IconTimeline,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -61,6 +62,7 @@ export default function Rail({ onBell }: { onBell: () => void }) {
       <RailButton icon={<IconTimeline size={20} />} label="时间线" active={pathname === "/timeline"} onClick={() => navigate("/timeline")} />
       <RailButton icon={<IconSearch size={20} />} label="搜索" />
       <div className="flex-1" />
+      <RailButton icon={<IconSettings size={20} />} label="设置" active={pathname === "/settings"} onClick={() => navigate("/settings")} />
       <RailButton icon={<IconRefresh size={20} />} label="同步(补发离线改动并拉取最新)" onClick={sync} />
       <RailButton icon={<IconBell size={20} />} label="提醒" badge={pending} onClick={onBell} />
     </nav>

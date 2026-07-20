@@ -55,6 +55,7 @@ const ulidStr = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/, "id 须为 26 位 U
 const taskFields = {
   title: z.string().min(1),
   due_date: dateStr.nullish(),
+  plan_date: dateStr.nullish(),
   recurrence: recurrenceStr.nullish(),
   start_date: dateStr.nullish(),
   end_date: dateStr.nullish(),
@@ -121,8 +122,10 @@ app.post("/tasks/:id/done", async (c) => {
   const task = await getTask(c.req.param("id"));
   if (!task) return c.json({ error: "not found" }, 404);
   const done = p.data.done ?? true;
-  // 一次性记在 due_date;收集箱任务(无日期)记在完成当天
-  const date = task.recurrence ? (p.data.date ?? todayLocal()) : (task.due_date ?? todayLocal());
+  // 一次性记在 due_date;只排期没死线的记在 plan_date;收集箱任务(无日期)记在完成当天
+  const date = task.recurrence
+    ? (p.data.date ?? todayLocal())
+    : (task.due_date ?? task.plan_date ?? todayLocal());
   await setTaskDone(task.id, date, done);
   return c.json({ task_id: task.id, date, done });
 });
