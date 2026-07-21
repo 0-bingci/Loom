@@ -17,6 +17,7 @@ import {
   getTask,
   listTasks,
   listTasksWithStatus,
+  setDayNote,
   setTaskDone,
   updateTask,
 } from "../core/tasks.js";
@@ -128,6 +129,20 @@ app.post("/tasks/:id/done", async (c) => {
     : (task.due_date ?? task.plan_date ?? todayLocal());
   await setTaskDone(task.id, date, done);
   return c.json({ task_id: task.id, date, done });
+});
+
+// 设某天的备注(循环任务按天记;date 默认今天)。任务级共享备注仍走 PATCH /tasks/:id {note}。
+app.post("/tasks/:id/day-note", async (c) => {
+  const p = parseBody(
+    z.object({ date: dateStr.optional(), note: z.string().nullish() }),
+    await c.req.json().catch(() => ({})),
+  );
+  if (!p.ok) return c.json({ error: p.error }, 400);
+  const task = await getTask(c.req.param("id"));
+  if (!task) return c.json({ error: "not found" }, 404);
+  const date = p.data.date ?? todayLocal();
+  await setDayNote(task.id, date, p.data.note ?? null);
+  return c.json({ task_id: task.id, date, note: p.data.note ?? null });
 });
 
 // ---- dashboard:算出来的视图 ----

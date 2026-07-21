@@ -10,7 +10,7 @@ import {
   IconSquareCheck,
   IconX,
 } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { selectTask } from "../app/dashboardSlice";
 import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
@@ -102,11 +102,24 @@ function StatusPicker({ task }: { task: Task }) {
 }
 
 /** 任务备注:失焦自动保存(离线走发件箱) */
-function NoteBox({ task }: { task: Task }) {
+/** 按内容自动撑高的 textarea(不出现内部滚动条)。 */
+function useAutoGrow(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return ref;
+}
+
+/** 任务级备注(tasks.note):所有日子共享。失焦自动保存,离线走发件箱。 */
+function NoteBox({ task, label = "备注", hint }: { task: Task; label?: string; hint?: string }) {
   const [note, setNote] = useState(task.note ?? "");
   const [saved, setSaved] = useState(false);
+  const ref = useAutoGrow(note);
 
-  // 切换任务时装入对应备注
   useEffect(() => {
     setNote(task.note ?? "");
     setSaved(false);
@@ -121,13 +134,60 @@ function NoteBox({ task }: { task: Task }) {
 
   return (
     <div className="mt-[18px] border-t border-line pt-4 text-[13px] text-ink3">
-      备注{saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
+      {label}
+      {hint && <span className="ml-1.5 text-[11px] text-ink3">{hint}</span>}
+      {saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
       <textarea
+        ref={ref}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         onBlur={() => void save()}
         placeholder="写点什么…(离开输入框自动保存)"
-        className="mt-2 min-h-[60px] w-full resize-none border-0 bg-transparent font-[inherit] text-ink outline-none"
+        rows={5}
+        className="mt-2 min-h-[140px] w-full resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-ink outline-none"
+      />
+    </div>
+  );
+}
+
+/** 当天备注(task_log.note):只属于 item.date 这一天(循环任务用)。 */
+function DayNoteBox({ item }: { item: DashboardItem }) {
+  const dispatch = useAppDispatch();
+  const [note, setNote] = useState(item.day_note ?? "");
+  const [saved, setSaved] = useState(false);
+  const ref = useAutoGrow(note);
+
+  // 切换任务或切换到不同的一天时,装入那天的备注
+  useEffect(() => {
+    setNote(item.day_note ?? "");
+    setSaved(false);
+  }, [item.task.id, item.date]);
+
+  const save = async () => {
+    if (note === (item.day_note ?? "")) return;
+    await sendOrQueue({
+      method: "POST",
+      path: `/tasks/${item.task.id}/day-note`,
+      body: { date: item.date, note: note || null },
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    void dispatch(syncNow());
+  };
+
+  return (
+    <div className="mt-[18px] border-t border-line pt-4 text-[13px] text-ink3">
+      今天的记录
+      <span className="ml-1.5 text-[11px] text-ink3">仅 {item.date} 这天</span>
+      {saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
+      <textarea
+        ref={ref}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => void save()}
+        placeholder="今天具体做了啥…(离开输入框自动保存)"
+        rows={4}
+        className="mt-2 min-h-[100px] w-full resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-ink outline-none"
       />
     </div>
   );
@@ -284,7 +344,14 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           <span className="text-ink2">默认(清单规划中)</span>
         </Prop>
 
-        <NoteBox task={t} />
+        {item.kind === "recurring" ? (
+          <>
+            <NoteBox task={t} label="任务备注" hint="每天都看得到" />
+            <DayNoteBox item={item} />
+          </>
+        ) : (
+          <NoteBox task={t} />
+        )}
       </div>
       )}
 

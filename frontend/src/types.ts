@@ -27,6 +27,7 @@ export interface DashboardItem {
   days_left: number | null; // 仅 upcoming:距死线还有几天
   done: boolean;
   done_at: string | null;
+  day_note: string | null; // 这一天的备注(循环任务按天记);共享备注在 task.note
   /** 仅前端:离线期间的改动,等待补发 */
   pendingSync?: boolean;
 }

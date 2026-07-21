@@ -58,8 +58,9 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
     done: boolean;
     done_at: string | null;
     done_date: string | null;
+    note: string | null;
   }>(
-    `SELECT task_id, date::text, done, done_at,
+    `SELECT task_id, date::text, done, done_at, note,
             to_char(done_at AT TIME ZONE $3, 'YYYY-MM-DD') AS done_date
      FROM task_log
      WHERE (task_id, date) IN (SELECT unnest($1::text[]), unnest($2::date[]))`,
@@ -86,6 +87,7 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
       days_left: c.upcoming ? daysBetween(date, t.due_date!) : null,
       done,
       done_at: log?.done_at ?? null,
+      day_note: log?.note ?? null,
     });
   }
 

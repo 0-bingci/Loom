@@ -26,6 +26,7 @@ export interface TaskLog {
   done: boolean;
   done_at: string | null;
   notified: boolean;
+  note: string | null; // 当天备注(循环任务按天各记各的)
 }
 
 export interface Notification {
@@ -48,4 +49,5 @@ export interface DashboardItem {
   days_left: number | null; // 仅 upcoming:距死线还有几天
   done: boolean;
   done_at: string | null;
+  day_note: string | null; // 这一天的备注(task_log.note);任务级共享备注在 task.note
 }

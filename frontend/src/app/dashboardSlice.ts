@@ -176,6 +176,7 @@ const dashboardSlice = createSlice({
           days_left: null,
           done: false,
           done_at: null,
+          day_note: null,
           pendingSync: true,
         });
       });

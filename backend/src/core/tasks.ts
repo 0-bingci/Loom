@@ -139,6 +139,16 @@ export async function setTaskDone(taskId: string, date: string, done: boolean): 
   );
 }
 
+/** 设某天的备注(循环任务按天记)。task_log 行不存在则建;不动 done/notified。 */
+export async function setDayNote(taskId: string, date: string, note: string | null): Promise<void> {
+  await getPool().query(
+    `INSERT INTO task_log (id, task_id, date, note)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (task_id, date) DO UPDATE SET note = $4`,
+    [ulid(), taskId, date, note],
+  );
+}
+
 /**
  * "态→勾"方向:status 改动时同步 task_log(仅非循环任务)。
  * 改成 done → 记完成;从 done 改走 → 取消完成。updateTask 之后调用。
