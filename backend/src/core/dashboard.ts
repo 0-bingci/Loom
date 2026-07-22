@@ -46,8 +46,9 @@ export async function getDashboard(date: string): Promise<DashboardItem[]> {
     return { overdue, dueToday, plannedForDay, upcoming, show: overdue || dueToday || plannedForDay || upcoming };
   };
 
+  // 关闭的一次性任务不做了(留档),不进今天视图;仍可在"所有"页跟踪、改回。
   const candidates = tasks.filter((t) =>
-    t.recurrence ? occursOn(t, date) : classify(t).show,
+    t.recurrence ? occursOn(t, date) : t.status !== "closed" && classify(t).show,
   );
   if (candidates.length === 0) return [];
 

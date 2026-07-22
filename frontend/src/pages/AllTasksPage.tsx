@@ -192,7 +192,7 @@ export default function AllTasksPage() {
             )}
             {visible.map((t) => {
               const overdueBadge =
-                !t.recurrence && !t.archived && t.status !== "done" && t.due_date && today && t.due_date < today;
+                !t.recurrence && !t.archived && t.status !== "done" && t.status !== "closed" && t.due_date && today && t.due_date < today;
               const expanded = expandedId === t.id;
               return (
                 <Fragment key={t.id}>

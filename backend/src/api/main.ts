@@ -62,7 +62,7 @@ const taskFields = {
   end_date: dateStr.nullish(),
   remind_time: timeStr.nullish(),
   note: z.string().nullish(),
-  status: z.enum(["todo", "doing", "testing", "done", "waiting", "incubating"]).optional(),
+  status: z.enum(["todo", "doing", "testing", "done", "waiting", "incubating", "closed"]).optional(),
 };
 
 // id 只允许在创建时带(幂等重放);PATCH 不许改主键。

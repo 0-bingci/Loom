@@ -11,13 +11,13 @@ export interface Task {
   remind_time: string | null; // 'HH:MM'
   note: string | null; // 备注(自由文本)
   sort_order: number | null; // 手动排序序号,NULL=未排
-  /** 六态两族;仅非循环任务有意义。推进线:todo/doing/testing/done;停靠区:waiting/incubating */
+  /** 仅非循环任务有意义。推进线:todo/doing/testing/done;停靠区:waiting/incubating;关闭:closed(不做了,留档) */
   status: TaskStatus;
   archived: boolean;
   created_at: string; // ISO8601
 }
 
-export type TaskStatus = "todo" | "doing" | "testing" | "done" | "waiting" | "incubating";
+export type TaskStatus = "todo" | "doing" | "testing" | "done" | "waiting" | "incubating" | "closed";
 
 export interface TaskLog {
   id: string;
