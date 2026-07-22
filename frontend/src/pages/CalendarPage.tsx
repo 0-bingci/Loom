@@ -1,8 +1,17 @@
-import { IconCheck, IconChevronLeft, IconChevronRight, IconRepeat } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCheck,
+  IconNote,
+  IconRepeat,
+} from "@tabler/icons-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toggleDone } from "../app/dashboardSlice";
+import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
 import { api } from "../lib/api";
+import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, fmtRecurrence, weekday } from "../lib/format";
 import type { Task } from "../types";
 
@@ -11,6 +20,59 @@ interface CalItem {
   date: string;
   kind: "once" | "recurring";
   done: boolean;
+  day_note: string | null;
+}
+
+/** 自动撑高、失焦保存的备注框。挂载时以 initial 打底;切换任务靠外层 key 重新挂载。 */
+function AutoNote({
+  initial,
+  label,
+  hint,
+  placeholder,
+  onSave,
+}: {
+  initial: string;
+  label: string;
+  hint?: string;
+  placeholder: string;
+  onSave: (note: string | null) => Promise<void> | void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [v, setV] = useState(initial);
+  const [saved, setSaved] = useState(false);
+  const savedInitial = useRef(initial);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [v]);
+
+  const save = async () => {
+    if (v === savedInitial.current) return;
+    await onSave(v || null);
+    savedInitial.current = v;
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <div className="text-[12.5px] text-ink3">
+      {label}
+      {hint && <span className="ml-1.5 text-[11px] text-ink3">{hint}</span>}
+      {saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
+      <textarea
+        ref={ref}
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => void save()}
+        placeholder={placeholder}
+        rows={2}
+        className="mt-1 min-h-[52px] w-full resize-none overflow-hidden rounded-lg border border-line bg-bg px-2.5 py-1.5 font-[inherit] text-[13px] text-ink outline-none focus:border-accent"
+      />
+    </div>
+  );
 }
 
 const WD_HEAD = ["一", "二", "三", "四", "五", "六", "日"];
@@ -22,6 +84,7 @@ export default function CalendarPage() {
   const [ym, setYm] = useState<{ y: number; m: number } | null>(null); // m: 1-12
   const [items, setItems] = useState<CalItem[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null); // 展开备注的任务:`${task.id}|${date}`
   const [error, setError] = useState(false);
 
   // 初始定位到"今天"所在月
@@ -81,34 +144,79 @@ export default function CalendarPage() {
         <div className="px-5 py-3 text-[13px] text-ink3">这天没有任务</div>
       ) : (
         <div className="px-3 pb-6">
-          {selItems.map((it) => (
-            <div key={`${it.task.id}|${it.date}`} className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 hover:bg-bg">
-              <button
-                aria-label={it.done ? "取消完成" : "完成"}
-                onClick={() => {
-                  void dispatch(toggleDone({ id: it.task.id, done: !it.done, date: it.date }));
-                  // 乐观更新本地日历状态
-                  setItems((prev) =>
-                    prev.map((p) => (p.task.id === it.task.id && p.date === it.date ? { ...p, done: !it.done } : p)),
-                  );
-                }}
-                className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md border-[1.6px] text-white ${
-                  it.done ? "border-accent bg-accent" : "border-line2 hover:border-accent"
-                }`}
-              >
-                {it.done && <IconCheck size={12} />}
-              </button>
-              <span className={`flex-1 text-[14px] ${it.done ? "text-ink3 line-through" : ""}`}>{it.task.title}</span>
-              {it.kind === "recurring" ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-rec-soft px-2 py-0.5 text-[11px] text-rec">
-                  <IconRepeat size={11} />
-                  {fmtRecurrence(it.task.recurrence!)}
-                </span>
-              ) : (
-                <span className="rounded-md bg-[#EFEDE6] px-2 py-0.5 text-[11px] text-ink2">一次性</span>
-              )}
-            </div>
-          ))}
+          {selItems.map((it) => {
+            const key = `${it.task.id}|${it.date}`;
+            const open = openKey === key;
+            const saveShared = async (note: string | null) => {
+              await sendOrQueue({ method: "PATCH", path: `/tasks/${it.task.id}`, body: { note } });
+              setItems((prev) => prev.map((p) => (p.task.id === it.task.id ? { ...p, task: { ...p.task, note } } : p)));
+              void dispatch(syncNow());
+            };
+            const saveDay = async (note: string | null) => {
+              await sendOrQueue({ method: "POST", path: `/tasks/${it.task.id}/day-note`, body: { date: it.date, note } });
+              setItems((prev) => prev.map((p) => (p.task.id === it.task.id && p.date === it.date ? { ...p, day_note: note } : p)));
+              void dispatch(syncNow());
+            };
+            return (
+              <div key={key} className={`rounded-[10px] ${open ? "bg-bg" : ""}`}>
+                <div className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 hover:bg-bg">
+                  <button
+                    aria-label={it.done ? "取消完成" : "完成"}
+                    onClick={() => {
+                      void dispatch(toggleDone({ id: it.task.id, done: !it.done, date: it.date }));
+                      setItems((prev) =>
+                        prev.map((p) => (p.task.id === it.task.id && p.date === it.date ? { ...p, done: !it.done } : p)),
+                      );
+                    }}
+                    className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md border-[1.6px] text-white ${
+                      it.done ? "border-accent bg-accent" : "border-line2 hover:border-accent"
+                    }`}
+                  >
+                    {it.done && <IconCheck size={12} />}
+                  </button>
+                  <button
+                    onClick={() => setOpenKey((k) => (k === key ? null : key))}
+                    title="点击查看/编辑备注"
+                    className={`flex min-w-0 flex-1 items-center gap-1.5 text-left text-[14px] ${it.done ? "text-ink3 line-through" : ""}`}
+                  >
+                    <IconChevronDown size={13} className={`shrink-0 text-ink3 transition-transform ${open ? "" : "-rotate-90"}`} />
+                    <span className="truncate">{it.task.title}</span>
+                    {(it.task.note || it.day_note) && <IconNote size={12} className="shrink-0 text-ink3" />}
+                  </button>
+                  {it.kind === "recurring" ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-rec-soft px-2 py-0.5 text-[11px] text-rec">
+                      <IconRepeat size={11} />
+                      {fmtRecurrence(it.task.recurrence!)}
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-[#EFEDE6] px-2 py-0.5 text-[11px] text-ink2">一次性</span>
+                  )}
+                </div>
+                {open && (
+                  <div className="flex flex-col gap-3 px-3 pb-3 pt-0.5">
+                    <AutoNote
+                      key={`${key}|shared`}
+                      initial={it.task.note ?? ""}
+                      label="备注"
+                      hint={it.kind === "recurring" ? "每天都看得到" : undefined}
+                      placeholder="写点描述…(离开输入框自动保存)"
+                      onSave={saveShared}
+                    />
+                    {it.kind === "recurring" && (
+                      <AutoNote
+                        key={`${key}|day`}
+                        initial={it.day_note ?? ""}
+                        label="今天的记录"
+                        hint={`仅 ${it.date} 这天`}
+                        placeholder="这天具体做了啥…(离开输入框自动保存)"
+                        onSave={saveDay}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

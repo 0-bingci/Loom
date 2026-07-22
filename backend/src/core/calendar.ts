@@ -11,6 +11,7 @@ export interface CalendarItem {
   date: string;
   kind: "once" | "recurring";
   done: boolean;
+  day_note: string | null; // 这一天的备注(task_log.note);共享备注在 task.note
 }
 
 function* eachDay(from: string, to: string): Generator<string> {
@@ -26,7 +27,7 @@ export async function getCalendar(from: string, to: string): Promise<CalendarIte
   const pool = getPool();
   const { rows: tasks } = await pool.query<Task>("SELECT * FROM tasks WHERE NOT archived");
 
-  const items: Omit<CalendarItem, "done">[] = [];
+  const items: Omit<CalendarItem, "done" | "day_note">[] = [];
   for (const t of tasks) {
     if (t.recurrence) {
       for (const day of eachDay(from, to)) {
@@ -38,12 +39,15 @@ export async function getCalendar(from: string, to: string): Promise<CalendarIte
   }
   if (items.length === 0) return [];
 
-  // 一次查出范围内所有完成状态
-  const { rows: logs } = await pool.query<{ task_id: string; date: string; done: boolean }>(
-    "SELECT task_id, date::text, done FROM task_log WHERE date BETWEEN $1 AND $2",
+  // 一次查出范围内所有完成状态与当天备注
+  const { rows: logs } = await pool.query<{ task_id: string; date: string; done: boolean; note: string | null }>(
+    "SELECT task_id, date::text, done, note FROM task_log WHERE date BETWEEN $1 AND $2",
     [from, to],
   );
-  const doneMap = new Map(logs.map((l) => [`${l.task_id}|${l.date}`, l.done]));
+  const logMap = new Map(logs.map((l) => [`${l.task_id}|${l.date}`, l]));
 
-  return items.map((it) => ({ ...it, done: doneMap.get(`${it.task.id}|${it.date}`) ?? false }));
+  return items.map((it) => {
+    const log = logMap.get(`${it.task.id}|${it.date}`);
+    return { ...it, done: log?.done ?? false, day_note: log?.note ?? null };
+  });
 }
