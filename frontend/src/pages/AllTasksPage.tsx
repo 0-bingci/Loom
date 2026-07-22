@@ -4,10 +4,13 @@ import {
   IconArrowDown,
   IconArrowUp,
   IconCheck,
+  IconChevronDown,
+  IconChevronRight,
+  IconNote,
   IconRepeat,
   IconTrash,
 } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toggleDone } from "../app/dashboardSlice";
 import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
@@ -28,6 +31,47 @@ const pill = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] 
 const th = "px-3 py-2 text-left text-xs font-medium text-ink2 select-none";
 const td = "px-3 py-2 align-middle";
 
+/** 展开行里的备注编辑:随内容撑高,失焦保存(离线走发件箱)。 */
+function NoteEditor({ task, onSaved }: { task: TaskWithStatus; onSaved: (note: string | null) => void }) {
+  const dispatch = useAppDispatch();
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [note, setNote] = useState(task.note ?? "");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [note]);
+
+  const save = async () => {
+    if (note === (task.note ?? "")) return;
+    await sendOrQueue({ method: "PATCH", path: `/tasks/${task.id}`, body: { note: note || null } });
+    onSaved(note || null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    void dispatch(syncNow());
+  };
+
+  return (
+    <div className="text-[13px] text-ink3">
+      备注
+      {task.recurrence && <span className="ml-1.5 text-[11px] text-ink3">(所有日子共享;某天的记录去今天/日历页写)</span>}
+      {saved && <span className="ml-2 text-[11px] text-accent">已保存</span>}
+      <textarea
+        ref={ref}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => void save()}
+        placeholder="写点描述…(离开输入框自动保存)"
+        rows={3}
+        className="mt-1.5 min-h-[72px] w-full resize-none overflow-hidden rounded-lg border border-line bg-bg px-3 py-2 font-[inherit] text-[13.5px] text-ink outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
 export default function AllTasksPage() {
   const dispatch = useAppDispatch();
   const today = useAppSelector((s) => s.dashboard.date);
@@ -35,6 +79,7 @@ export default function AllTasksPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: "created_at", asc: false });
   const [error, setError] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -148,8 +193,10 @@ export default function AllTasksPage() {
             {visible.map((t) => {
               const overdueBadge =
                 !t.recurrence && !t.archived && t.status !== "done" && t.due_date && today && t.due_date < today;
+              const expanded = expandedId === t.id;
               return (
-                <tr key={t.id} className={`border-b border-line last:border-b-0 hover:bg-bg ${t.archived ? "opacity-55" : ""}`}>
+                <Fragment key={t.id}>
+                <tr className={`border-b border-line hover:bg-bg ${expanded ? "bg-bg" : ""} ${t.archived ? "opacity-55" : ""}`}>
                   <td className={`${td} text-center`}>
                     {!t.recurrence && (
                       <button
@@ -163,7 +210,21 @@ export default function AllTasksPage() {
                       </button>
                     )}
                   </td>
-                  <td className={`${td} ${t.once_done ? "text-ink3 line-through" : ""}`}>{t.title}</td>
+                  <td
+                    className={`${td} cursor-pointer ${t.once_done ? "text-ink3 line-through" : ""}`}
+                    onClick={() => setExpandedId((id) => (id === t.id ? null : t.id))}
+                    title="点击查看/编辑备注"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {expanded ? (
+                        <IconChevronDown size={14} className="shrink-0 text-ink3" />
+                      ) : (
+                        <IconChevronRight size={14} className="shrink-0 text-ink3" />
+                      )}
+                      <span>{t.title}</span>
+                      {t.note && <IconNote size={13} className="shrink-0 text-ink3" />}
+                    </span>
+                  </td>
                   <td className={td}>
                     {t.recurrence ? (
                       <span className={`${pill} bg-rec-soft text-rec`}>
@@ -219,6 +280,20 @@ export default function AllTasksPage() {
                     </button>
                   </td>
                 </tr>
+                {expanded && (
+                  <tr className="border-b border-line bg-bg">
+                    <td></td>
+                    <td colSpan={7} className="px-3 pb-4 pt-0.5 pr-6">
+                      <NoteEditor
+                        task={t}
+                        onSaved={(note) =>
+                          setRows((prev) => prev.map((r) => (r.id === t.id ? { ...r, note } : r)))
+                        }
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
