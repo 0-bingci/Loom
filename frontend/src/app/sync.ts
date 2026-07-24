@@ -1,6 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { flushQueue, loadSnapshot, saveSnapshot } from "../lib/outbox";
 import { fetchDashboard, hydrate } from "./dashboardSlice";
+import { fetchLists, hydrateLists } from "./listsSlice";
 import { fetchNotifications, hydrateNotifications } from "./notificationsSlice";
 import type { RootState } from "./store";
 import { setOffline, setQueued } from "./syncSlice";
@@ -15,17 +16,24 @@ export const syncNow = createAsyncThunk("sync/now", async (_: void, { dispatch, 
 
   const dash = await dispatch(fetchDashboard());
   await dispatch(fetchNotifications());
+  await dispatch(fetchLists());
 
   if (fetchDashboard.fulfilled.match(dash)) {
     dispatch(setOffline(false));
     const s = getState() as RootState;
-    saveSnapshot({ date: s.dashboard.date, items: s.dashboard.items, notifs: s.notifications.items });
+    saveSnapshot({
+      date: s.dashboard.date,
+      items: s.dashboard.items,
+      notifs: s.notifications.items,
+      lists: s.lists.items,
+    });
   } else if (dash.error.name !== "AuthError") {
     dispatch(setOffline(true));
     const snap = loadSnapshot();
     if (snap) {
       dispatch(hydrate({ date: snap.date, items: snap.items }));
       dispatch(hydrateNotifications(snap.notifs));
+      if (snap.lists) dispatch(hydrateLists(snap.lists));
     }
   }
 });

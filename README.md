@@ -41,10 +41,13 @@ npm run dev      # http://localhost:5173,API 请求经 vite 代理转给 8787
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/tasks` | 建任务:`{title, due_date?}` 一次性 / `{title, recurrence, start_date?, end_date?}` 循环;`remind_time?` 均可带。可带客户端生成的 `id`(26 位 ULID)——同 id 重放幂等去重,供离线补发用 |
+| POST | `/tasks` | 建任务:`{title, due_date?}` 一次性 / `{title, recurrence, start_date?, end_date?}` 循环;`remind_time?`、`list_id?`(归到某清单)均可带。可带客户端生成的 `id`(26 位 ULID)——同 id 重放幂等去重,供离线补发用 |
 | GET | `/tasks` | 列任务(`?include_archived=true` 含归档) |
-| GET/PATCH/DELETE | `/tasks/:id` | 查/改/删 |
+| GET/PATCH/DELETE | `/tasks/:id` | 查/改/删(PATCH 可带 `list_id`,传 `null` = 移出清单) |
 | POST | `/tasks/:id/done` | 标完成 `{done?: bool, date?: 'YYYY-MM-DD'}`(循环任务默认今天;一次性记在 due_date 上) |
+| POST | `/lists` | 建清单:`{name, color?}`,可带客户端 `id`(幂等) |
+| GET | `/lists` | 列清单(`?include_archived=true` 含归档),每条带 `task_count`(未归档任务数) |
+| PATCH/DELETE | `/lists/:id` | 改(`name`/`color`/`sort_order`/`archived`)/删。删清单不删任务,其下任务 `list_id` 置空(回到未分类) |
 | GET | `/dashboard` | 当天视图(`?date=` 看任意一天);算出来的,不预生成 |
 | GET | `/notifications` | 拉通知(`?status=pending`) |
 | POST | `/notifications/:id/read` | 标读 |

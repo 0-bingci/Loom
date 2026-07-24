@@ -18,6 +18,7 @@ import { sendOrQueue } from "../lib/outbox";
 import { fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
 import { STATUSES, type TaskStatus } from "../lib/status";
 import type { DashboardItem, Task } from "../types";
+import ListPicker from "./ListPicker";
 import TaskEditor from "./TaskEditor";
 
 function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; children: React.ReactNode }) {
@@ -341,7 +342,7 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
           </span>
         </Prop>
         <Prop icon={<IconList size={17} />} k="清单">
-          <span className="text-ink2">默认(清单规划中)</span>
+          <ListPicker listId={t.list_id} taskId={t.id} />
         </Prop>
 
         {item.kind === "recurring" ? (

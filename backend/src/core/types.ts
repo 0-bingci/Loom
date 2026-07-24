@@ -11,8 +11,19 @@ export interface Task {
   remind_time: string | null; // 'HH:MM'
   note: string | null; // 备注(自由文本)
   sort_order: number | null; // 手动排序序号,NULL=未排
+  list_id: string | null; // 所属清单;NULL=未分类
   /** 仅非循环任务有意义。推进线:todo/doing/testing/done;停靠区:waiting/incubating;关闭:closed(不做了,留档) */
   status: TaskStatus;
+  archived: boolean;
+  created_at: string; // ISO8601
+}
+
+/** 清单:任务的命名分组。与类型/状态正交,只管归类。 */
+export interface List {
+  id: string;
+  name: string;
+  color: string | null; // 前端色标,可空
+  sort_order: number | null; // 手动排序,NULL=未排
   archived: boolean;
   created_at: string; // ISO8601
 }

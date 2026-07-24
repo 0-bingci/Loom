@@ -8,6 +8,7 @@ import { getCalendar } from "../core/calendar.js";
 import { config } from "../core/config.js";
 import { getDashboard } from "../core/dashboard.js";
 import { todayLocal } from "../core/dates.js";
+import { createList, deleteList, listLists, updateList } from "../core/lists.js";
 import { createNote, deleteNote, listNotes, updateNote } from "../core/notes.js";
 import { listNotifications, markNotificationRead } from "../core/notifications.js";
 import { isValidRecurrence } from "../core/recurrence.js";
@@ -63,6 +64,7 @@ const taskFields = {
   remind_time: timeStr.nullish(),
   note: z.string().nullish(),
   status: z.enum(["todo", "doing", "testing", "done", "waiting", "incubating", "closed"]).optional(),
+  list_id: ulidStr.nullish(), // 归到某清单;null = 未分类
 };
 
 // id 只允许在创建时带(幂等重放);PATCH 不许改主键。
@@ -173,6 +175,44 @@ app.patch("/notes/:id", async (c) => {
 
 app.delete("/notes/:id", async (c) => {
   const ok = await deleteNote(c.req.param("id"));
+  return ok ? c.body(null, 204) : c.json({ error: "not found" }, 404);
+});
+
+// ---- lists:任务分组,纯 CRUD ----
+const createListSchema = z.object({
+  id: ulidStr.optional(),
+  name: z.string().min(1),
+  color: z.string().nullish(),
+});
+const updateListSchema = z
+  .object({
+    name: z.string().min(1),
+    color: z.string().nullable(),
+    sort_order: z.number().finite().nullable(),
+    archived: z.boolean(),
+  })
+  .partial();
+
+app.post("/lists", async (c) => {
+  const p = parseBody(createListSchema, await c.req.json());
+  if (!p.ok) return c.json({ error: p.error }, 400);
+  return c.json(await createList(p.data), 201);
+});
+
+app.get("/lists", async (c) => {
+  const includeArchived = c.req.query("include_archived") === "true";
+  return c.json(await listLists({ includeArchived }));
+});
+
+app.patch("/lists/:id", async (c) => {
+  const p = parseBody(updateListSchema, await c.req.json());
+  if (!p.ok) return c.json({ error: p.error }, 400);
+  const list = await updateList(c.req.param("id"), p.data);
+  return list ? c.json(list) : c.json({ error: "not found" }, 404);
+});
+
+app.delete("/lists/:id", async (c) => {
+  const ok = await deleteList(c.req.param("id"));
   return ok ? c.body(null, 204) : c.json({ error: "not found" }, 404);
 });
 
