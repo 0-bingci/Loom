@@ -239,7 +239,6 @@ function blankTask(id: string, title: string): Task {
     remind_time: null,
     note: null,
     sort_order: null,
-    list_id: null,
     status: "todo",
     archived: false,
     created_at: new Date().toISOString(),

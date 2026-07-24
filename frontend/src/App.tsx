@@ -10,7 +10,6 @@ import TokenGate from "./components/TokenGate";
 import AllTasksPage from "./pages/AllTasksPage";
 import CalendarPage from "./pages/CalendarPage";
 import InboxPage from "./pages/InboxPage";
-import ListPage from "./pages/ListPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 import TodayPage from "./pages/TodayPage";
@@ -32,8 +31,7 @@ function Shell() {
   const [bellOpen, setBellOpen] = useState(false);
   const { pathname } = useLocation();
   // 侧边栏是"任务"区的导航,日历/时间线页不需要它
-  const showSidebar =
-    ["/today", "/week", "/all", "/inbox"].includes(pathname) || pathname.startsWith("/list/");
+  const showSidebar = ["/today", "/week", "/all", "/inbox"].includes(pathname);
 
   useEffect(() => {
     void dispatch(syncNow());
@@ -70,7 +68,6 @@ export default function App() {
         <Route path="/today" element={<TodayPage />} />
         <Route path="/week" element={<WeekPage />} />
         <Route path="/all" element={<AllTasksPage />} />
-        <Route path="/list/:id" element={<ListPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/settings" element={<SettingsPage />} />

@@ -1,7 +1,6 @@
-import { IconCalendarWeek, IconInbox, IconList, IconPlus, IconSun, IconTable } from "@tabler/icons-react";
+import { IconCalendarWeek, IconInbox, IconSun, IconTable } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { addList } from "../app/listsSlice";
-import { useAppDispatch, useAppSelector } from "../app/store";
+import { useAppSelector } from "../app/store";
 
 function NavItem({
   icon,
@@ -26,24 +25,17 @@ function NavItem({
       }`}
     >
       <span className="w-[18px] text-center text-[17px] text-ink2">{icon}</span>
-      <span className="flex-1 truncate">{label}</span>
+      <span className="flex-1">{label}</span>
       {count !== undefined && <span className="text-xs text-ink3">{count}</span>}
     </div>
   );
 }
 
 export default function Sidebar() {
-  const dispatch = useAppDispatch();
   const items = useAppSelector((s) => s.dashboard.items);
   const loaded = useAppSelector((s) => s.dashboard.loaded);
-  const lists = useAppSelector((s) => s.lists.items);
   const navigate = useNavigate();
   const { pathname } = useLocation();
-
-  const newList = () => {
-    const name = window.prompt("新清单名")?.trim();
-    if (name) void dispatch(addList(name));
-  };
 
   return (
     <aside className="hidden overflow-y-auto border-r border-line bg-sidebar px-2.5 py-4 xl:block">
@@ -76,32 +68,6 @@ export default function Sidebar() {
         active={pathname === "/all"}
         onClick={() => navigate("/all")}
       />
-
-      <div className="mt-4 flex items-center justify-between px-[9px] pb-1 text-[11px] font-medium tracking-wide text-ink3">
-        <span>清单</span>
-        <button aria-label="新建清单" title="新建清单" onClick={newList} className="hover:text-ink">
-          <IconPlus size={14} />
-        </button>
-      </div>
-      {lists.length === 0 ? (
-        <div
-          onClick={newList}
-          className="cursor-pointer rounded-lg px-[9px] py-[7px] text-[13px] text-ink3 hover:bg-sidebar-hover"
-        >
-          还没有清单,点 + 新建
-        </div>
-      ) : (
-        lists.map((l) => (
-          <NavItem
-            key={l.id}
-            icon={<IconList size={17} />}
-            label={l.name}
-            count={l.task_count || undefined}
-            active={pathname === `/list/${l.id}`}
-            onClick={() => navigate(`/list/${l.id}`)}
-          />
-        ))
-      )}
     </aside>
   );
 }

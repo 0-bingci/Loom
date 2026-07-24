@@ -2,7 +2,7 @@
 // 断网时写操作进 localStorage 队列,恢复后按序补发;创建带客户端 ULID,服务端幂等去重。
 
 import { getToken } from "./api";
-import type { DashboardItem, ListWithCount, Notification } from "../types";
+import type { DashboardItem, Notification } from "../types";
 
 export interface Op {
   method: string;
@@ -86,7 +86,6 @@ export interface Snapshot {
   date: string;
   items: DashboardItem[];
   notifs: Notification[];
-  lists?: ListWithCount[]; // 可选:旧快照没有这一字段
 }
 
 export const saveSnapshot = (snap: Snapshot) => localStorage.setItem(SNAP_KEY, JSON.stringify(snap));

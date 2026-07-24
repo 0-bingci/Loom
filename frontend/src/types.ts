@@ -11,26 +11,10 @@ export interface Task {
   remind_time: string | null;
   note: string | null; // 备注(自由文本)
   sort_order: number | null; // 手动排序序号,NULL=未排
-  list_id: string | null; // 所属清单;NULL=未分类
   /** 六态两族;仅非循环任务有意义 */
   status: import("./lib/status").TaskStatus;
   archived: boolean;
   created_at: string;
-}
-
-/** 清单:任务的命名分组(与类型/状态正交)。 */
-export interface List {
-  id: string;
-  name: string;
-  color: string | null;
-  sort_order: number | null;
-  archived: boolean;
-  created_at: string;
-}
-
-/** 清单 + 其下未归档任务数(侧边栏计数用)。 */
-export interface ListWithCount extends List {
-  task_count: number;
 }
 
 export interface DashboardItem {

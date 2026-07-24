@@ -164,7 +164,6 @@ const dashboardSlice = createSlice({
             remind_time: b.remind_time,
             note: null,
             sort_order: null,
-            list_id: null,
             status: "todo",
             archived: false,
             created_at: new Date().toISOString(),

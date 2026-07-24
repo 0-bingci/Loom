@@ -2,7 +2,6 @@ import {
   IconBell,
   IconCalendar,
   IconCalendarStats,
-  IconList,
   IconPencil,
   IconProgress,
   IconRepeat,
@@ -18,7 +17,6 @@ import { sendOrQueue } from "../lib/outbox";
 import { fmtRecurrence, fmtWindow, overdueDays } from "../lib/format";
 import { STATUSES, type TaskStatus } from "../lib/status";
 import type { DashboardItem, Task } from "../types";
-import ListPicker from "./ListPicker";
 import TaskEditor from "./TaskEditor";
 
 function Prop({ icon, k, children }: { icon: React.ReactNode; k: string; children: React.ReactNode }) {
@@ -341,10 +339,6 @@ function DetailContent({ item, onClose }: { item: DashboardItem; onClose: () => 
             )}
           </span>
         </Prop>
-        <Prop icon={<IconList size={17} />} k="清单">
-          <ListPicker listId={t.list_id} taskId={t.id} />
-        </Prop>
-
         {item.kind === "recurring" ? (
           <>
             <NoteBox task={t} label="任务备注" hint="每天都看得到" />

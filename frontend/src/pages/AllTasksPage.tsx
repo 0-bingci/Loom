@@ -11,12 +11,9 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { toggleDone } from "../app/dashboardSlice";
-import { removeList, renameList } from "../app/listsSlice";
 import { syncNow } from "../app/sync";
 import { useAppDispatch, useAppSelector } from "../app/store";
-import ListPicker from "../components/ListPicker";
 import { api } from "../lib/api";
 import { sendOrQueue } from "../lib/outbox";
 import { fmtDate, fmtRecurrence, fmtWindow } from "../lib/format";
@@ -75,17 +72,9 @@ function NoteEditor({ task, onSaved }: { task: TaskWithStatus; onSaved: (note: s
   );
 }
 
-/** listId 传入时:只显示该清单下的任务,并带清单管理头(改名/删除)。不传 = 全部任务。 */
-export default function AllTasksPage({ listId }: { listId?: string } = {}) {
+export default function AllTasksPage() {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const today = useAppSelector((s) => s.dashboard.date);
-  const lists = useAppSelector((s) => s.lists.items);
-  const currentList = listId ? lists.find((l) => l.id === listId) : undefined;
-  const listName = useCallback(
-    (id: string | null) => (id ? (lists.find((l) => l.id === id)?.name ?? null) : null),
-    [lists],
-  );
   const [rows, setRows] = useState<TaskWithStatus[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: "created_at", asc: false });
@@ -114,30 +103,14 @@ export default function AllTasksPage({ listId }: { listId?: string } = {}) {
   };
 
   const visible = useMemo(() => {
-    const list = rows
-      .filter((t) => showArchived || !t.archived)
-      .filter((t) => !listId || t.list_id === listId);
+    const list = rows.filter((t) => showArchived || !t.archived);
     const dir = sort.asc ? 1 : -1;
     return [...list].sort((a, b) => {
       const va = sort.key === "title" ? a.title : sort.key === "date" ? (a.due_date ?? a.start_date ?? "") : a.created_at;
       const vb = sort.key === "title" ? b.title : sort.key === "date" ? (b.due_date ?? b.start_date ?? "") : b.created_at;
       return va < vb ? -dir : va > vb ? dir : 0;
     });
-  }, [rows, showArchived, sort, listId]);
-
-  const doRename = async () => {
-    if (!currentList) return;
-    const name = window.prompt("清单名", currentList.name)?.trim();
-    if (!name || name === currentList.name) return;
-    await dispatch(renameList({ id: currentList.id, name }));
-  };
-
-  const doDelete = async () => {
-    if (!currentList) return;
-    if (!window.confirm(`删除清单「${currentList.name}」?其下任务不会删,只会回到"未分类"。`)) return;
-    await dispatch(removeList(currentList.id));
-    navigate("/all");
-  };
+  }, [rows, showArchived, sort]);
 
   const header = (key: SortKey, label: string) => (
     <th
@@ -176,25 +149,11 @@ export default function AllTasksPage({ listId }: { listId?: string } = {}) {
     <main className="flex flex-col overflow-y-auto bg-bg pb-20 md:pb-6 xl:col-span-2">
       <div className="flex flex-wrap items-end justify-between gap-2 px-4 pt-5 pb-3 md:px-7">
         <h1 className="flex items-baseline gap-2.5 text-xl font-medium">
-          {listId ? (currentList?.name ?? "清单") : "所有"}
+          所有
           <span className="text-[13px] font-normal text-ink3">
-            {(() => {
-              const inScope = rows.filter((t) => !listId || t.list_id === listId);
-              const active = inScope.filter((t) => !t.archived).length;
-              const archived = inScope.filter((t) => t.archived).length;
-              return (
-                <>
-                  {active} 条{archived > 0 && `,另有已归档 ${archived} 条`}
-                </>
-              );
-            })()}
+            {rows.filter((t) => !t.archived).length} 条
+            {rows.some((t) => t.archived) && `,另有已归档 ${rows.filter((t) => t.archived).length} 条`}
           </span>
-          {currentList && (
-            <span className="flex items-baseline gap-2 text-[12px] font-normal">
-              <button onClick={() => void doRename()} className="text-ink3 hover:text-ink">改名</button>
-              <button onClick={() => void doDelete()} className="text-ink3 hover:text-over">删除清单</button>
-            </span>
-          )}
         </h1>
         <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-ink2">
           <input
@@ -264,9 +223,6 @@ export default function AllTasksPage({ listId }: { listId?: string } = {}) {
                       )}
                       <span>{t.title}</span>
                       {t.note && <IconNote size={13} className="shrink-0 text-ink3" />}
-                      {!listId && listName(t.list_id) && (
-                        <span className={`${pill} bg-accent-soft text-accent`}>{listName(t.list_id)}</span>
-                      )}
                     </span>
                   </td>
                   <td className={td}>
@@ -328,16 +284,6 @@ export default function AllTasksPage({ listId }: { listId?: string } = {}) {
                   <tr className="border-b border-line bg-bg">
                     <td></td>
                     <td colSpan={7} className="px-3 pb-4 pt-0.5 pr-6">
-                      <div className="mb-3 flex items-center gap-2 text-[13px] text-ink3">
-                        清单
-                        <ListPicker
-                          listId={t.list_id}
-                          taskId={t.id}
-                          onChanged={(list_id) =>
-                            setRows((prev) => prev.map((r) => (r.id === t.id ? { ...r, list_id } : r)))
-                          }
-                        />
-                      </div>
                       <NoteEditor
                         task={t}
                         onSaved={(note) =>
